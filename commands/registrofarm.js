@@ -447,6 +447,7 @@ export async function handleInteraction(interaction) {
     }
 
     // Botão PAGAR META (Admin)
+    // Botão PAGAR META (Admin) - Abre Modal
     if (customId.startsWith('farm_pagar_meta_btn_')) {
       try {
         const donoId = customId.replace('farm_pagar_meta_btn_', '');
@@ -461,64 +462,112 @@ export async function handleInteraction(interaction) {
           return await interaction.reply({ content: '❌ Você não tem permissão para gerenciar esta meta!', ephemeral: true });
         }
 
+        const modal = new ModalBuilder()
+          .setCustomId(`farm_pagar_meta_modal_${donoId}`)
+          .setTitle('💸 Confirmar Pagamento 💸');
+
+        const valorInput = new TextInputBuilder()
+          .setCustomId('valor_input')
+          .setLabel('VALOR PAGO')
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('Digite o valor pago (ex: 100k, 50.000)')
+          .setRequired(true);
+
         const now = new Date();
-        const dataPagamento = now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const dataFormatada = now.toLocaleDateString('pt-BR');
 
-        // Registrar meta paga
-        addPaidMeta(donoId, {
-          pagoPor: interaction.user.id,
-          data: dataPagamento
-        });
+        const dataInput = new TextInputBuilder()
+          .setCustomId('data_input')
+          .setLabel('DATA DO PAGAMENTO')
+          .setStyle(TextInputStyle.Short)
+          .setValue(dataFormatada)
+          .setPlaceholder('DD/MM/AAAA')
+          .setRequired(true);
 
-        // Reagir com 💲 (conforme requisitado)
-        await interaction.message.react('💲').catch(() => null);
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(valorInput),
+          new ActionRowBuilder().addComponents(dataInput)
+        );
 
-        // Obter data da mensagem original
-        const msgDate = interaction.message.createdAt || new Date();
-        const dataMensagem = msgDate.toLocaleDateString('pt-BR') + ' às ' + msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        await interaction.showModal(modal);
 
-        const originalEmbed = interaction.message.embeds[0];
-        let updatedEmbed;
-        if (originalEmbed) {
-          updatedEmbed = EmbedBuilder.from(originalEmbed)
-            .setTitle('💲 META PAGA 💲')
-            .setColor(3066993)
-            .setDescription(
-              `👤 **Membro:** <@${donoId}>\n` +
-              `📅 **Data da Meta:** ${dataMensagem}\n` +
-              `💲 **Pago por:** <@${interaction.user.id}>\n` +
-              `📆 **Data do Pagamento:** ${dataPagamento}`
-            );
-        } else {
-          updatedEmbed = new EmbedBuilder()
-            .setTitle('💲 META PAGA 💲')
-            .setColor(3066993)
-            .setDescription(
-              `👤 **Membro:** <@${donoId}>\n` +
-              `📅 **Data da Meta:** ${dataMensagem}\n` +
-              `💲 **Pago por:** <@${interaction.user.id}>\n` +
-              `📆 **Data do Pagamento:** ${dataPagamento}`
-            );
+      } catch (error) {
+        console.error('Erro ao abrir modal de pagamento de meta:', error);
+        await interaction.reply({ content: 'Erro ao abrir formulário de confirmação de pagamento.', ephemeral: true });
+      }
+    }
+
+    // Botão Desconfirmar Meta (Admin)
+    if (customId.startsWith('farm_desconfirmar_meta_btn_')) {
+      try {
+        const donoId = customId.replace('farm_desconfirmar_meta_btn_', '');
+
+        // Verificar permissão
+        const channelConfig = getFarmChannel(interaction.channelId);
+        const hasPermission = channelConfig && channelConfig.cargosAdminIds
+          ? channelConfig.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
+          : interaction.member.permissions.has('Administrator');
+
+        if (!hasPermission) {
+          return await interaction.reply({ content: '❌ Você não tem permissão para desconfirmar esta meta!', ephemeral: true });
         }
 
-        const desconfirmMetaBtn = new ButtonBuilder()
-          .setCustomId(`farm_desconfirmar_meta_btn_${donoId}`)
-          .setLabel('Desconfirmar Meta')
+        // Remover do banco
+        removePaidMeta(donoId);
+
+        // Remover reação 💸 (ou 💲 caso o usuário clique em uma antiga)
+        const reaction = interaction.message.reactions.cache.find(r => r.emoji.name === '💸' || r.emoji.name === '💲');
+        if (reaction) {
+          await reaction.users.remove(interaction.client.user.id).catch(() => null);
+        }
+
+        // Reverter embed
+        const originalEmbed = interaction.message.embeds[0];
+        let timestamp = '';
+        if (originalEmbed && originalEmbed.description) {
+          const match = originalEmbed.description.match(/📅 \*\*Data da Meta:\*\* ([^\n]+)/);
+          if (match) {
+            timestamp = match[1];
+          }
+        }
+        if (!timestamp) {
+          const msgDate = interaction.message.createdAt || new Date();
+          timestamp = msgDate.toLocaleDateString('pt-BR') + ' às ' + msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        const revertedEmbed = new EmbedBuilder()
+          .setTitle('✨ META BATIDA ✨')
+          .setDescription(
+            `👤 **Membro:** <@${donoId}>\n` +
+            `📅 **Data/Hora:** ${timestamp}\n\n` +
+            `Aguardando a confirmação do pagamento pelos administradores.`
+          )
+          .setColor(3066993)
+          .setFooter({ text: 'Lux Farm' });
+
+        const btnPagar = new ButtonBuilder()
+          .setCustomId(`farm_pagar_meta_btn_${donoId}`)
+          .setLabel('Pagar Meta')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('💸');
+
+        const btnIncompleta = new ButtonBuilder()
+          .setCustomId(`farm_meta_incompleta_btn_${donoId}`)
+          .setLabel('Meta Incompleta')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji('↩️');
+          .setEmoji('⚠️');
 
-        const row = new ActionRowBuilder().addComponents(desconfirmMetaBtn);
+        const row = new ActionRowBuilder().addComponents(btnPagar, btnIncompleta);
 
-        // Desativar botões e atualizar a mensagem informando a data da mensagem
         await interaction.update({
           content: null,
-          embeds: [updatedEmbed],
+          embeds: [revertedEmbed],
           components: [row]
         });
 
       } catch (error) {
-        console.error('Erro ao pagar meta:', error);
-        await interaction.reply({ content: 'Erro ao processar o pagamento da meta.', ephemeral: true });
+        console.error('Erro ao desconfirmar meta:', error);
+        await interaction.reply({ content: 'Erro ao desconfirmar o pagamento da meta.', ephemeral: true });
       }
     }
 
@@ -712,6 +761,74 @@ export async function handleInteraction(interaction) {
       } catch (error) {
         console.error('Erro ao enviar declaração de farm:', error);
         await interaction.reply({ content: 'Erro ao registrar declaração de farm.', ephemeral: true });
+      }
+    }
+
+    // Modal de Pagamento de Meta (Confirmar Pagamento)
+    if (customId.startsWith('farm_pagar_meta_modal_')) {
+      try {
+        const donoId = customId.replace('farm_pagar_meta_modal_', '');
+        const valor = interaction.fields.getTextInputValue('valor_input');
+        const dataStr = interaction.fields.getTextInputValue('data_input');
+
+        // Registrar meta paga no banco
+        addPaidMeta(donoId, {
+          pagoPor: interaction.user.id,
+          valor: valor,
+          data: dataStr
+        });
+
+        // Reagir com 💸 (conforme requisitado para trocar 💲 por 💸)
+        await interaction.message.react('💸').catch(() => null);
+
+        // Obter data da mensagem original
+        const msgDate = interaction.message.createdAt || new Date();
+        const dataMensagem = msgDate.toLocaleDateString('pt-BR') + ' às ' + msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        const originalEmbed = interaction.message.embeds[0];
+        let updatedEmbed;
+        if (originalEmbed) {
+          updatedEmbed = EmbedBuilder.from(originalEmbed)
+            .setTitle('💸 META PAGA 💸')
+            .setColor(3066993)
+            .setDescription(
+              `👤 **Membro:** <@${donoId}>\n` +
+              `📅 **Data da Meta:** ${dataMensagem}\n` +
+              `💰 **Valor Pago:** ${valor}\n` +
+              `💸 **Pago por:** <@${interaction.user.id}>\n` +
+              `📆 **Data do Pagamento:** ${dataStr}`
+            );
+        } else {
+          updatedEmbed = new EmbedBuilder()
+            .setTitle('💸 META PAGA 💸')
+            .setColor(3066993)
+            .setDescription(
+              `👤 **Membro:** <@${donoId}>\n` +
+              `📅 **Data da Meta:** ${dataMensagem}\n` +
+              `💰 **Valor Pago:** ${valor}\n` +
+              `💸 **Pago por:** <@${interaction.user.id}>\n` +
+              `📆 **Data do Pagamento:** ${dataStr}`
+            );
+        }
+
+        const desconfirmMetaBtn = new ButtonBuilder()
+          .setCustomId(`farm_desconfirmar_meta_btn_${donoId}`)
+          .setLabel('Desconfirmar Meta')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('↩️');
+
+        const row = new ActionRowBuilder().addComponents(desconfirmMetaBtn);
+
+        // Desativar botões e atualizar a mensagem
+        await interaction.update({
+          content: null,
+          embeds: [updatedEmbed],
+          components: [row]
+        });
+
+      } catch (error) {
+        console.error('Erro ao processar modal de pagamento de meta:', error);
+        await interaction.reply({ content: 'Erro ao processar pagamento da meta.', ephemeral: true });
       }
     }
 
