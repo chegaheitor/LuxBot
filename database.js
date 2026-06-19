@@ -6,7 +6,7 @@ const DB_PATH = path.resolve('database.json');
 // Inicializa o banco de dados se o arquivo não existir
 export function initDatabase() {
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {} }, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [] }, null, 2));
   } else {
     try {
       const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
@@ -16,11 +16,12 @@ export function initDatabase() {
       if (!data.farmPaineis) { data.farmPaineis = []; modified = true; }
       if (!data.farmCanais) { data.farmCanais = []; modified = true; }
       if (!data.logChannels) { data.logChannels = {}; modified = true; }
+      if (!data.vendaPaineis) { data.vendaPaineis = []; modified = true; }
       if (modified) {
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
       }
     } catch (e) {
-      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {} }, null, 2));
+      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [] }, null, 2));
     }
   }
 }
@@ -290,5 +291,26 @@ export function getLogChannel(commandName) {
   const db = getDatabase();
   if (!db.logChannels) return null;
   return db.logChannels[commandName] || null;
+}
+
+// Salva a configuração de painel de vendas no banco
+export function saveVendaPanel(config) {
+  const db = getDatabase();
+  const vendaPaineis = db.vendaPaineis || [];
+  const index = vendaPaineis.findIndex(p => p.forumCanalId === config.forumCanalId);
+
+  if (index !== -1) {
+    vendaPaineis[index] = { ...vendaPaineis[index], ...config, updatedAt: new Date().toISOString() };
+  } else {
+    vendaPaineis.push({ ...config, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+  }
+
+  return saveDatabase({ ...db, vendaPaineis });
+}
+
+// Obtém a configuração de painel de vendas pelo canal de fórum
+export function getVendaPanel(forumCanalId) {
+  const vendaPaineis = getDatabase().vendaPaineis || [];
+  return vendaPaineis.find(p => p.forumCanalId === forumCanalId) || null;
 }
 

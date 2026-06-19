@@ -126,7 +126,7 @@ export async function handleInteraction(interaction) {
 
         // D. Criar o canal de texto
         const guild = interaction.guild;
-        const channelName = `📦┃${recruta.nome}-farm`;
+        const channelName = `${recruta.nome} | ${recruta.gameId} - farm`;
 
         const permissionOverwrites = [
           {

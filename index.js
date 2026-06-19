@@ -119,6 +119,15 @@ client.on(Events.InteractionCreate, async interaction => {
         console.error('Erro ao processar interação do configlog:', error);
       }
     }
+  } else if (customId.startsWith('venda_')) {
+    const command = client.commands.get('registrovenda');
+    if (command && typeof command.handleInteraction === 'function') {
+      try {
+        await command.handleInteraction(interaction);
+      } catch (error) {
+        console.error('Erro ao processar interação do registrovenda:', error);
+      }
+    }
   }
 });
 
