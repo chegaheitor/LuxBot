@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, ChannelType, PermissionFlagsBits } from 'discord.js';
-import { getRecrutas, saveFarmPanel, getFarmPanel, saveFarmChannel, getFarmChannel, deleteFarmChannel, hasActiveFarmChannel, addConfirmedFarm, addPaidMeta } from '../database.js';
+import { getRecrutas, saveFarmPanel, getFarmPanel, saveFarmChannel, getFarmChannel, deleteFarmChannel, hasActiveFarmChannel, getActiveFarmChannel, addConfirmedFarm, addPaidMeta, removeConfirmedFarm, removePaidMeta } from '../database.js';
 
 export const data = new SlashCommandBuilder()
   .setName('registrofarm')
@@ -105,9 +105,10 @@ export async function handleInteraction(interaction) {
         }
 
         // B. Verificar se ele já possui uma pasta de farm ativa
-        if (hasActiveFarmChannel(userId)) {
+        const activeChannel = getActiveFarmChannel(userId);
+        if (activeChannel) {
           return await interaction.reply({
-            content: '❌ Você já possui uma pasta de farm ativa! Você não pode ter mais de uma ao mesmo tempo.',
+            content: `❌ Você já possui uma pasta de farm ativa! Acesse aqui: <#${activeChannel.canalId}>`,
             ephemeral: true
           });
         }
@@ -270,15 +271,126 @@ export async function handleInteraction(interaction) {
         // Adicionar reação ✅ na mensagem original
         await interaction.message.react('✅').catch(() => null);
 
-        // Desativar botões
+        // Atualizar embed mostrando status confirmado
+        const originalEmbed = interaction.message.embeds[0];
+        let updatedEmbed;
+        if (originalEmbed) {
+          updatedEmbed = EmbedBuilder.from(originalEmbed)
+            .setTitle('✅ FARM CONFIRMADO ✅')
+            .setColor(3066993)
+            .setDescription(
+              `👤 **Enviado por:** <@${userId}>\n` +
+              `📦 **Recurso:** ${item}\n` +
+              `🔢 **Quantidade:** ${quantidade}\n` +
+              `📅 **Data:** ${dataStr}\n\n` +
+              `✅ **Confirmado por:** <@${interaction.user.id}>`
+            );
+        } else {
+          updatedEmbed = new EmbedBuilder()
+            .setTitle('✅ FARM CONFIRMADO ✅')
+            .setColor(3066993)
+            .setDescription(
+              `👤 **Enviado por:** <@${userId}>\n` +
+              `📦 **Recurso:** ${item}\n` +
+              `🔢 **Quantidade:** ${quantidade}\n` +
+              `📅 **Data:** ${dataStr}\n\n` +
+              `✅ **Confirmado por:** <@${interaction.user.id}>`
+            );
+        }
+
+        const desconfirmBtn = new ButtonBuilder()
+          .setCustomId(`farm_desconfirmar_btn_${userId}_${item}_${quantidade}_${dataStr}`)
+          .setLabel('Desconfirmar Farm')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('↩️');
+
+        const row = new ActionRowBuilder().addComponents(desconfirmBtn);
+
         await interaction.update({
-          content: `✅ Farm confirmado por <@${interaction.user.id}>! Adicionado ao perfil.`,
-          components: []
+          content: null,
+          embeds: [updatedEmbed],
+          components: [row]
         });
 
       } catch (error) {
         console.error('Erro ao confirmar farm:', error);
         await interaction.reply({ content: 'Erro ao processar a confirmação do farm.', ephemeral: true });
+      }
+    }
+
+    // Botão Desconfirmar Farm (Admin)
+    if (customId.startsWith('farm_desconfirmar_btn_')) {
+      try {
+        const parts = customId.replace('farm_desconfirmar_btn_', '').split('_');
+        const userId = parts[0];
+        const item = parts[1];
+        const quantidade = parts[2];
+        const dataStr = parts[3];
+
+        // Verificar permissões
+        const channelConfig = getFarmChannel(interaction.channelId);
+        const hasPermission = channelConfig && channelConfig.cargosAdminIds
+          ? channelConfig.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
+          : interaction.member.permissions.has('Administrator');
+
+        if (!hasPermission) {
+          return await interaction.reply({ content: '❌ Você não tem permissão para desconfirmar este farm!', ephemeral: true });
+        }
+
+        // Remover do banco
+        removeConfirmedFarm(userId, item, quantidade, dataStr);
+
+        // Remover reação ✅
+        const reaction = interaction.message.reactions.cache.get('✅');
+        if (reaction) {
+          await reaction.users.remove(interaction.client.user.id).catch(() => null);
+        }
+
+        // Reverter embed
+        const originalEmbed = interaction.message.embeds[0];
+        let updatedEmbed;
+        if (originalEmbed) {
+          updatedEmbed = EmbedBuilder.from(originalEmbed)
+            .setTitle('🌾 NOVO FARM DECLARADO 🌾')
+            .setColor(2326507)
+            .setDescription(
+              `👤 **Enviado por:** <@${userId}>\n` +
+              `📦 **Recurso:** ${item}\n` +
+              `🔢 **Quantidade:** ${quantidade}\n` +
+              `📅 **Data:** ${dataStr}\n\n` +
+              `Aguardando confirmação de um administrador.`
+            );
+        } else {
+          updatedEmbed = new EmbedBuilder()
+            .setTitle('🌾 NOVO FARM DECLARADO 🌾')
+            .setColor(2326507)
+            .setDescription(
+              `👤 **Enviado por:** <@${userId}>\n` +
+              `📦 **Recurso:** ${item}\n` +
+              `🔢 **Quantidade:** ${quantidade}\n` +
+              `📅 **Data:** ${dataStr}\n\n` +
+              `Aguardando confirmação de um administrador.`
+            );
+        }
+
+        // Reverter botão
+        const confirmBtn = new ButtonBuilder()
+          .setCustomId(`farm_confirmar_btn_${userId}_${item}_${quantidade}_${dataStr}`)
+          .setLabel('Confirmar Farm')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('✔️');
+
+        const row = new ActionRowBuilder().addComponents(confirmBtn);
+
+        await interaction.update({
+          content: null,
+          embeds: [updatedEmbed],
+          components: [row]
+        });
+
+      } catch (error) {
+        console.error('Erro ao desconfirmar farm:', error);
+        await interaction.reply({ content: 'Erro ao desconfirmar o farm.', ephemeral: true });
       }
     }
 
@@ -307,7 +419,7 @@ export async function handleInteraction(interaction) {
           .setCustomId(`farm_pagar_meta_btn_${channelConfig.donoId}`)
           .setLabel('Pagar Meta')
           .setStyle(ButtonStyle.Success)
-          .setEmoji('💲');
+          .setEmoji('�');
 
         const btnIncompleta = new ButtonBuilder()
           .setCustomId(`farm_meta_incompleta_btn_${channelConfig.donoId}`)
@@ -364,7 +476,7 @@ export async function handleInteraction(interaction) {
             .setDescription(
               `👤 **Membro:** <@${donoId}>\n` +
               `📅 **Data da Meta:** ${dataMensagem}\n` +
-              `💸 **Pago por:** <@${interaction.user.id}>\n` +
+              `💲 **Pago por:** <@${interaction.user.id}>\n` +
               `📆 **Data do Pagamento:** ${dataPagamento}`
             );
         } else {
@@ -374,16 +486,24 @@ export async function handleInteraction(interaction) {
             .setDescription(
               `👤 **Membro:** <@${donoId}>\n` +
               `📅 **Data da Meta:** ${dataMensagem}\n` +
-              `💸 **Pago por:** <@${interaction.user.id}>\n` +
+              `💲 **Pago por:** <@${interaction.user.id}>\n` +
               `📆 **Data do Pagamento:** ${dataPagamento}`
             );
         }
 
+        const desconfirmMetaBtn = new ButtonBuilder()
+          .setCustomId(`farm_desconfirmar_meta_btn_${donoId}`)
+          .setLabel('Desconfirmar Meta')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('↩️');
+
+        const row = new ActionRowBuilder().addComponents(desconfirmMetaBtn);
+
         // Desativar botões e atualizar a mensagem informando a data da mensagem
         await interaction.update({
-          content: `✅ Meta de <@${donoId}> paga por <@${interaction.user.id}>!`,
+          content: null,
           embeds: [updatedEmbed],
-          components: []
+          components: [row]
         });
 
       } catch (error) {
@@ -585,18 +705,60 @@ export async function handleInteraction(interaction) {
         const donoId = customId.replace('farm_meta_incompleta_modal_', '');
         const motivo = interaction.fields.getTextInputValue('motivo_input');
 
+        const originalEmbed = interaction.message.embeds[0];
+        let updatedEmbed;
+        if (originalEmbed) {
+          updatedEmbed = EmbedBuilder.from(originalEmbed)
+            .setTitle('⚠️ META INCOMPLETA ⚠️')
+            .setColor(15158332)
+            .setDescription(
+              originalEmbed.description +
+              `\n\n❌ **Marcada como Incompleta por:** <@${interaction.user.id}>\n` +
+              `📝 **Motivo:** *${motivo}*`
+            );
+        } else {
+          updatedEmbed = new EmbedBuilder()
+            .setTitle('⚠️ META INCOMPLETA ⚠️')
+            .setColor(15158332)
+            .setDescription(
+              `👤 **Membro:** <@${donoId}>\n` +
+              `❌ **Marcada como Incompleta por:** <@${interaction.user.id}>\n` +
+              `📝 **Motivo:** *${motivo}*`
+            );
+        }
+
         // Desativar botões da mensagem de aprovação de meta
         await interaction.update({
-          content: `⚠️ Meta incompleta! Justificativa enviada.`,
-          embeds: [],
+          content: null,
+          embeds: [updatedEmbed],
           components: []
         });
 
-        // Envia notificação marcando o usuário dono da pasta
+        // Responder ao admin de forma oculta (ephemeral)
+        await interaction.followUp({
+          content: `⚠️ Meta incompleta! Justificativa enviada.`,
+          ephemeral: true
+        });
+
+        // Envia notificação bonita no canal marcando o usuário dono da pasta
+        const now = new Date();
+        const timestamp = now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        const channelNotificationEmbed = new EmbedBuilder()
+          .setTitle('⚠️ PEDIDO DE META INCORRETO ⚠️')
+          .setDescription(
+            `Olá <@${donoId}>, seu pedido de meta foi marcado como **incompleta/errada**!\n\n` +
+            `📝 **Motivo:** *${motivo}*\n` +
+            `👮 **Verificado por:** <@${interaction.user.id}>\n` +
+            `📅 **Data/Hora:** ${timestamp}\n\n` +
+            `Por favor, realize a correção dos valores ou lance os farms corretos.`
+          )
+          .setColor(15158332)
+          .setFooter({ text: 'Lux Farm' });
+
         await interaction.channel.send({
-          content: `⚠️ <@${donoId}>, seu pedido de meta foi marcado como **incompleta/errada** por <@${interaction.user.id}>!\n` +
-                   `📝 **Motivo:** *${motivo}*\n\n` +
-                   `Por favor, realize a correção dos valores ou lance os farms corretos.`
+          content: `<@${donoId}>`,
+          embeds: [channelNotificationEmbed]
         });
       } catch (error) {
         console.error('Erro ao enviar justificativa de meta errada:', error);

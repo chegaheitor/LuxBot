@@ -214,3 +214,51 @@ export function addPaidMeta(discordId, metaData) {
 
   return saveDatabase({ ...db, recrutas });
 }
+
+// Retorna o canal de farm ativo do usuário
+export function getActiveFarmChannel(donoId) {
+  const farmCanais = getDatabase().farmCanais || [];
+  return farmCanais.find(c => c.donoId === donoId) || null;
+}
+
+// Remove um farm confirmado do recruta
+export function removeConfirmedFarm(discordId, item, quantidade, dataStr) {
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  const index = recrutas.findIndex(r => r.discordId === discordId);
+
+  if (index === -1 || !recrutas[index].farms) {
+    return false;
+  }
+
+  const farmIndex = recrutas[index].farms.findIndex(f => 
+    f.item === item && 
+    f.quantidade === quantidade && 
+    f.data === dataStr
+  );
+
+  if (farmIndex !== -1) {
+    recrutas[index].farms.splice(farmIndex, 1);
+    return saveDatabase({ ...db, recrutas });
+  }
+
+  return false;
+}
+
+// Remove o último registro de meta paga do recruta
+export function removePaidMeta(discordId) {
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  const index = recrutas.findIndex(r => r.discordId === discordId);
+
+  if (index === -1 || !recrutas[index].metasPagas) {
+    return false;
+  }
+
+  if (recrutas[index].metasPagas.length > 0) {
+    recrutas[index].metasPagas.pop();
+    return saveDatabase({ ...db, recrutas });
+  }
+
+  return false;
+}
