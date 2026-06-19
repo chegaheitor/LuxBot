@@ -6,7 +6,7 @@ const DB_PATH = path.resolve('database.json');
 // Inicializa o banco de dados se o arquivo não existir
 export function initDatabase() {
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [] }, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [] }, null, 2));
   } else {
     try {
       const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
@@ -17,11 +17,12 @@ export function initDatabase() {
       if (!data.farmCanais) { data.farmCanais = []; modified = true; }
       if (!data.logChannels) { data.logChannels = {}; modified = true; }
       if (!data.vendaPaineis) { data.vendaPaineis = []; modified = true; }
+      if (!data.encomendaPaineis) { data.encomendaPaineis = []; modified = true; }
       if (modified) {
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
       }
     } catch (e) {
-      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [] }, null, 2));
+      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [] }, null, 2));
     }
   }
 }
@@ -312,5 +313,26 @@ export function saveVendaPanel(config) {
 export function getVendaPanel(forumCanalId) {
   const vendaPaineis = getDatabase().vendaPaineis || [];
   return vendaPaineis.find(p => p.forumCanalId === forumCanalId) || null;
+}
+
+// Salva a configuração de painel de encomendas no banco
+export function saveEncomendaPanel(config) {
+  const db = getDatabase();
+  const encomendaPaineis = db.encomendaPaineis || [];
+  const index = encomendaPaineis.findIndex(p => p.forumCanalId === config.forumCanalId);
+
+  if (index !== -1) {
+    encomendaPaineis[index] = { ...encomendaPaineis[index], ...config, updatedAt: new Date().toISOString() };
+  } else {
+    encomendaPaineis.push({ ...config, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+  }
+
+  return saveDatabase({ ...db, encomendaPaineis });
+}
+
+// Obtém a configuração de painel de encomendas pelo canal de fórum
+export function getEncomendaPanel(forumCanalId) {
+  const encomendaPaineis = getDatabase().encomendaPaineis || [];
+  return encomendaPaineis.find(p => p.forumCanalId === forumCanalId) || null;
 }
 

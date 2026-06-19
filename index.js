@@ -128,6 +128,15 @@ client.on(Events.InteractionCreate, async interaction => {
         console.error('Erro ao processar interação do registrovenda:', error);
       }
     }
+  } else if (customId.startsWith('encomenda_')) {
+    const command = client.commands.get('registroencomenda');
+    if (command && typeof command.handleInteraction === 'function') {
+      try {
+        await command.handleInteraction(interaction);
+      } catch (error) {
+        console.error('Erro ao processar interação do registroencomenda:', error);
+      }
+    }
   }
 });
 

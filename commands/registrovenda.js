@@ -97,6 +97,9 @@ export async function execute(interaction) {
       }
     });
 
+    // Fixar o tópico criado no Fórum
+    await thread.pin().catch(() => null);
+
     await interaction.reply({
       content: `✅ Painel de vendas configurado e publicado com sucesso no fórum! Acesse o tópico: ${thread}`,
       ephemeral: true
@@ -264,11 +267,26 @@ export async function handleInteraction(interaction) {
         .setFooter({ text: 'Lux Vendas' })
         .setTimestamp();
 
+      const btnConfirmar = new ButtonBuilder()
+        .setCustomId(`venda_confirmar_btn_${interaction.user.id}`)
+        .setLabel('Confirmar Venda')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('✔️');
+
+      const btnExcluir = new ButtonBuilder()
+        .setCustomId('venda_excluir_btn')
+        .setLabel('Excluir Venda')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🗑️');
+
+      const rowButtons = new ActionRowBuilder().addComponents(btnConfirmar, btnExcluir);
+
       // Criar novo tópico no fórum correspondente
       const newThread = await forumChannel.threads.create({
         name: `🛍️┃Venda - ${cliente} - ${dataVenda}`,
         message: {
-          embeds: [saleEmbed]
+          embeds: [saleEmbed],
+          components: [rowButtons]
         }
       });
 
@@ -299,6 +317,94 @@ export async function handleInteraction(interaction) {
         content: '❌ Ocorreu um erro ao processar o registro da sua venda.',
         ephemeral: true
       });
+    }
+    return;
+  }
+
+  // 3. Botão Confirmar Venda clicado
+  if (customId.startsWith('venda_confirmar_btn_')) {
+    try {
+      const vendedorId = customId.replace('venda_confirmar_btn_', '');
+      const forumId = interaction.channel.parentId;
+
+      const config = getVendaPanel(forumId);
+      const hasPermission = config && config.cargosPermitidosIds
+        ? config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId))
+        : interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+      if (!hasPermission) {
+        return await interaction.reply({
+          content: '❌ Você não tem permissão para confirmar esta venda!',
+          ephemeral: true
+        });
+      }
+
+      // Reagir com 💸
+      await interaction.message.react('💸').catch(() => null);
+
+      // Editar embed
+      const originalEmbed = interaction.message.embeds[0];
+      let updatedEmbed = EmbedBuilder.from(originalEmbed)
+        .setTitle('✅ VENDA CONFIRMADA ✅')
+        .setColor(3066993)
+        .addFields({ name: '✔️ Confirmado por:', value: `<@${interaction.user.id}>`, inline: true });
+
+      await interaction.update({
+        embeds: [updatedEmbed],
+        components: [] // remove os botões
+      });
+
+      // Log de confirmação
+      const logEmbed = new EmbedBuilder()
+        .setTitle('✅ Venda Confirmada')
+        .setColor(3066993)
+        .setDescription(`O administrador <@${interaction.user.id}> confirmou a venda realizada por <@${vendedorId}> no fórum <#${forumId}>.`)
+        .setTimestamp();
+
+      await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
+
+    } catch (error) {
+      console.error('Erro ao confirmar venda:', error);
+      await interaction.reply({ content: '❌ Erro ao confirmar venda.', ephemeral: true }).catch(() => null);
+    }
+    return;
+  }
+
+  // 4. Botão Excluir Venda clicado
+  if (customId === 'venda_excluir_btn') {
+    try {
+      const forumId = interaction.channel.parentId;
+
+      const config = getVendaPanel(forumId);
+      const hasPermission = config && config.cargosPermitidosIds
+        ? config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId))
+        : interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+      if (!hasPermission) {
+        return await interaction.reply({
+          content: '❌ Você não tem permissão para excluir esta venda!',
+          ephemeral: true
+        });
+      }
+
+      const thread = interaction.channel;
+
+      // Enviar log antes de deletar o canal
+      const logEmbed = new EmbedBuilder()
+        .setTitle('🗑️ Venda Excluída')
+        .setColor(15158332)
+        .setDescription(`O administrador <@${interaction.user.id}> excluiu o tópico de venda **${thread.name}** no fórum <#${forumId}>.`)
+        .setTimestamp();
+
+      await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
+
+      // Deletar o canal/thread correspondente
+      await interaction.reply({ content: 'Excluindo tópico de venda...', ephemeral: true });
+      await thread.delete().catch(() => null);
+
+    } catch (error) {
+      console.error('Erro ao excluir venda:', error);
+      await interaction.reply({ content: '❌ Erro ao excluir venda.', ephemeral: true }).catch(() => null);
     }
     return;
   }
