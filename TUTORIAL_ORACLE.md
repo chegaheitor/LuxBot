@@ -96,31 +96,33 @@ Após conectar na VM via SSH, você verá o prompt do Ubuntu (`ubuntu@luxbot-ins
 
 ## 🚀 Passo 5: Subir o Bot para a VM e Configurar
 
-Você pode enviar seu código criando um repositório privado no GitHub (recomendado) ou enviando os arquivos via SCP. Usando a abordagem do **Git/GitHub**:
+Usaremos o comando Git com o seu token de acesso pessoal (PAT) para clonar o repositório diretamente no terminal da sua máquina virtual Oracle:
 
-1. Suba o código do bot do seu computador para o seu repositório no GitHub (lembre-se de que o `.env` e `node_modules` estão no `.gitignore` e não serão enviados).
-2. Na VM, clone o repositório:
+1. Na VM, clone o repositório rodando o seguinte comando:
    ```bash
-   git clone https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
+   git clone https://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@github.com/chegaheitor/LuxBot.git
    ```
-3. Acesse a pasta do projeto:
+2. Acesse a pasta do projeto clonado:
    ```bash
-   cd SEU_REPOSITORIO
+   cd LuxBot
    ```
-4. Instale as dependências de produção:
+3. Instale as dependências de produção necessárias para rodar o bot:
    ```bash
    npm install --omit=dev
    ```
-5. Crie e configure o arquivo `.env` na VM usando o editor nano:
+4. Crie e configure o arquivo `.env` contendo as credenciais do seu bot dentro do servidor da Oracle:
    ```bash
    nano .env
    ```
-6. Copie as configurações a seguir para dentro do arquivo (substituindo pelos seus dados reais):
+5. Copie e cole o seguinte conteúdo de configuração no editor nano da VM:
    ```env
-   DISCORD_TOKEN=SEU_TOKEN_COPIADO_DO_PORTAL_DEVELOPER
-   DISCORD_CLIENT_ID=1517353934400786615
+DISCORD_TOKEN=MTUxNzM1MzkzNDQwMDc4NjYxNQ.G9eqrX.aoMHSHh7FnFi_va432rKZeIdPcdYCY8HIM3NWo
+DISCORD_CLIENT_ID=1517353934400786615
    ```
-7. Pressione `CTRL + O` para salvar, `ENTER` para confirmar e `CTRL + X` para sair do editor.
+6. No editor nano, pressione:
+   - `CTRL + O` para salvar o arquivo.
+   - `ENTER` para confirmar o nome do arquivo.
+   - `CTRL + X` para fechar o editor.
 
 ---
 
@@ -174,3 +176,56 @@ Se fecharmos o terminal SSH, o processo do bot é encerrado. Para mantê-lo roda
 - **Ver consumo de CPU/RAM:** `pm2 monit`
 
 Pronto! Seu bot está rodando de forma 100% gratuita, segura e online 24 horas por dia na Oracle Cloud! 🎉
+
+---
+
+## ⚡ Passo 8: Como Atualizar o Bot com Coisas Novas (Deploy de Atualizações)
+Toda vez que você alterar o código do bot no seu computador local e quiser subir as alterações para a VM na Oracle Cloud, siga o procedimento abaixo:
+
+### 1. No seu Computador (Local):
+1. Salve todas as alterações no código.
+2. Adicione e envie as alterações para o seu repositório GitHub:
+   ```bash
+   git add .
+   git commit -m "Adicionando comando registroembed e modal"
+   git push origin main
+   ```
+
+### 2. Na VM da Oracle Cloud (via SSH):
+1. Acesse o terminal da sua VM.
+2. Navegue até a pasta do projeto:
+   ```bash
+   cd LuxBot
+   ```
+3. Puxe as atualizações do GitHub:
+   ```bash
+   git pull
+   ```
+4. Se você adicionou novas dependências, instale-as:
+   ```bash
+   npm install --omit=dev
+   ```
+5. Atualize/Registre os novos comandos slash no Discord (como o `/registroembed`):
+   ```bash
+   npm run deploy
+   ```
+6. Reinicie o processo do bot no PM2 para aplicar o novo código:
+   ```bash
+   pm2 restart luxbot
+   ```
+7. Pronto! A nova versão do bot está ativa. Acompanhe os logs se quiser usando:
+   ```bash
+   pm2 logs luxbot
+   ```
+
+---
+
+## 🔑 Bônus: Conexão Rápida com o Oracle Cloud (Sem digitar o comando longo)
+Na pasta do projeto, criamos o arquivo `conectar.bat` para automatizar a abertura da conexão SSH:
+
+1. Abra o arquivo [conectar.bat](file:///c:/Users/heito/Documents/LuxBot/conectar.bat) no seu editor de código local.
+2. Edite os caminhos de acordo com os seus dados reais:
+   - Defina em `set CHAVE_PRIVADA=` o caminho absoluto para o arquivo `.key` da sua chave privada (ex: `C:\Users\heito\Downloads\ssh-key-lux.key`).
+   - Defina em `set IP_PUBLICO=` o IP público da sua instância Oracle.
+3. Salve o arquivo.
+4. Agora, sempre que o terminal fechar ou você quiser acessar a máquina, basta dar **dois cliques em `conectar.bat`** pelo Windows Explorer ou executá-lo no terminal para abrir o console da Oracle Cloud instantaneamente!

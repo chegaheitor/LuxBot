@@ -1,4 +1,4 @@
-import { REST, Routes, SlashCommandBuilder } from 'discord.js';
+import { REST, Routes, SlashCommandBuilder, ChannelType } from 'discord.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -15,7 +15,22 @@ if (!token || !clientId) {
 const commands = [
   new SlashCommandBuilder()
     .setName('ping')
-    .setDescription('Responde com Pong! e exibe as latências do bot.')
+    .setDescription('Responde com Pong! e exibe as latências do bot.'),
+  new SlashCommandBuilder()
+    .setName('registroembed')
+    .setDescription('Envia o painel de recrutamento para o canal selecionado.')
+    .addChannelOption(option =>
+      option.setName('canal_painel')
+        .setDescription('O canal onde a mensagem com o botão de recrutamento será enviada')
+        .setRequired(true)
+        .addChannelTypes(ChannelType.GuildText)
+    )
+    .addChannelOption(option =>
+      option.setName('canal_pedidos')
+        .setDescription('O canal para onde as respostas do formulário serão enviadas')
+        .setRequired(true)
+        .addChannelTypes(ChannelType.GuildText)
+    )
 ].map(command => command.toJSON());
 
 // Preparar o cliente REST da API do Discord
