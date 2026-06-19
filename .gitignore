@@ -2,3 +2,18 @@ node_modules/
 .env
 .DS_Store
 *.log
+
+# Credenciais
+.env
+CREDENCIAIS.md
+
+# Chaves SSH
+*.key
+*.pem
+
+# Arquivos locais
+conectar.bat
+
+# Documentação privada
+APAGAR_GIT.md
+TUTORIAL_ORACLE.md
