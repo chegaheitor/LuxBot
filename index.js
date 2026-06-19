@@ -17,7 +17,7 @@ const client = new Client({
 });
 
 // Evento quando o bot fica online
-client.once('ready', () => {
+client.once('clientReady', () => {
   console.log(`\n==========================================`);
   console.log(`Bot conectado com sucesso como: ${client.user.tag}`);
   console.log(`Pressione CTRL+C para encerrar o bot.`);
