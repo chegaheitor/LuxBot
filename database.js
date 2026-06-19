@@ -6,7 +6,7 @@ const DB_PATH = path.resolve('database.json');
 // Inicializa o banco de dados se o arquivo não existir
 export function initDatabase() {
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [] }, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [] }, null, 2));
   } else {
     try {
       const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
@@ -18,11 +18,12 @@ export function initDatabase() {
       if (!data.logChannels) { data.logChannels = {}; modified = true; }
       if (!data.vendaPaineis) { data.vendaPaineis = []; modified = true; }
       if (!data.encomendaPaineis) { data.encomendaPaineis = []; modified = true; }
+      if (!data.ausenciaPaineis) { data.ausenciaPaineis = []; modified = true; }
       if (modified) {
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
       }
     } catch (e) {
-      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [] }, null, 2));
+      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [] }, null, 2));
     }
   }
 }
@@ -335,4 +336,26 @@ export function getEncomendaPanel(forumCanalId) {
   const encomendaPaineis = getDatabase().encomendaPaineis || [];
   return encomendaPaineis.find(p => p.forumCanalId === forumCanalId) || null;
 }
+
+// Salva a configuração de painel de ausência no banco
+export function saveAusenciaPanel(config) {
+  const db = getDatabase();
+  const ausenciaPaineis = db.ausenciaPaineis || [];
+  const index = ausenciaPaineis.findIndex(p => p.canalId === config.canalId);
+
+  if (index !== -1) {
+    ausenciaPaineis[index] = { ...ausenciaPaineis[index], ...config, updatedAt: new Date().toISOString() };
+  } else {
+    ausenciaPaineis.push({ ...config, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+  }
+
+  return saveDatabase({ ...db, ausenciaPaineis });
+}
+
+// Obtém a configuração de painel de ausência pelo canal
+export function getAusenciaPanel(canalId) {
+  const ausenciaPaineis = getDatabase().ausenciaPaineis || [];
+  return ausenciaPaineis.find(p => p.canalId === canalId) || null;
+}
+
 

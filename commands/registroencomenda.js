@@ -377,12 +377,18 @@ export async function handleInteraction(interaction) {
         .setFooter({ text: 'Lux Encomendas' })
         .setTimestamp();
 
-      // Botões do Estado Em Produção: Entregar Encomenda e Excluir Encomenda
+      // Botões do Estado Em Produção: Entregar Encomenda, Voltar a Pendente e Excluir Encomenda
       const btnEntregar = new ButtonBuilder()
         .setCustomId(`encomenda_entregar_btn_${donoId}`)
         .setLabel('Entregar Encomenda')
         .setStyle(ButtonStyle.Success)
         .setEmoji('✅');
+
+      const btnVoltar = new ButtonBuilder()
+        .setCustomId(`encomenda_pendente_btn_${donoId}`)
+        .setLabel('Voltar a Pendente')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('⏳');
 
       const btnExcluir = new ButtonBuilder()
         .setCustomId('encomenda_excluir_btn')
@@ -390,7 +396,7 @@ export async function handleInteraction(interaction) {
         .setStyle(ButtonStyle.Danger)
         .setEmoji('🗑️');
 
-      const rowButtons = new ActionRowBuilder().addComponents(btnEntregar, btnExcluir);
+      const rowButtons = new ActionRowBuilder().addComponents(btnEntregar, btnVoltar, btnExcluir);
 
       await interaction.update({
         embeds: [updatedEmbed],
