@@ -1,5 +1,8 @@
-import { REST, Routes, SlashCommandBuilder, ChannelType } from 'discord.js';
+import { REST, Routes } from 'discord.js';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+import { pathToFileURL } from 'url';
 
 dotenv.config();
 
@@ -11,48 +14,28 @@ if (!token || !clientId) {
   process.exit(1);
 }
 
-// Definição dos comandos slash
-const commands = [
-  new SlashCommandBuilder()
-    .setName('ping')
-    .setDescription('Responde com Pong! e exibe as latências do bot.'),
-  new SlashCommandBuilder()
-    .setName('registroembed')
-    .setDescription('Envia o painel de recrutamento para o canal selecionado.')
-    .addChannelOption(option =>
-      option.setName('canal_painel')
-        .setDescription('O canal onde a mensagem com o botão de recrutamento será enviada')
-        .setRequired(true)
-        .addChannelTypes(ChannelType.GuildText)
-    )
-    .addChannelOption(option =>
-      option.setName('canal_pedidos')
-        .setDescription('O canal para onde as respostas do formulário serão enviadas')
-        .setRequired(true)
-        .addChannelTypes(ChannelType.GuildText)
-    )
-    .addChannelOption(option =>
-      option.setName('canal_logs_negado')
-        .setDescription('O canal para onde as notificações de recusa serão enviadas')
-        .setRequired(true)
-        .addChannelTypes(ChannelType.GuildText)
-    )
-    .addRoleOption(option =>
-      option.setName('cargo_admin_1')
-        .setDescription('Cargo autorizado a gerenciar o recrutamento')
-        .setRequired(true)
-    )
-    .addRoleOption(option =>
-      option.setName('cargo_admin_2')
-        .setDescription('Segundo cargo autorizado a gerenciar o recrutamento (opcional)')
-        .setRequired(false)
-    )
-    .addRoleOption(option =>
-      option.setName('cargo_admin_3')
-        .setDescription('Terceiro cargo autorizado a gerenciar o recrutamento (opcional)')
-        .setRequired(false)
-    )
-].map(command => command.toJSON());
+// Carregar comandos dinamicamente da pasta ./commands
+const commands = [];
+const commandsPath = path.resolve('commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+
+console.log('Carregando comandos para deploy...');
+for (const file of commandFiles) {
+  const filePath = path.join(commandsPath, file);
+  const fileUrl = pathToFileURL(filePath).href;
+  
+  try {
+    const command = await import(fileUrl);
+    if ('data' in command && 'execute' in command) {
+      commands.push(command.data.toJSON());
+      console.log(`- Comando carregado: /${command.data.name}`);
+    } else {
+      console.log(`[AVISO] O comando em ${file} está faltando as propriedades "data" ou "execute".`);
+    }
+  } catch (error) {
+    console.error(`Erro ao carregar o comando ${file} para deploy:`, error);
+  }
+}
 
 // Preparar o cliente REST da API do Discord
 const rest = new REST({ version: '10' }).setToken(token);
