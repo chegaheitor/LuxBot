@@ -101,6 +101,24 @@ client.on(Events.InteractionCreate, async interaction => {
         console.error('Erro ao processar interação do registrofarm:', error);
       }
     }
+  } else if (customId.startsWith('configfarm_')) {
+    const command = client.commands.get('configfarm');
+    if (command && typeof command.handleInteraction === 'function') {
+      try {
+        await command.handleInteraction(interaction);
+      } catch (error) {
+        console.error('Erro ao processar interação do configfarm:', error);
+      }
+    }
+  } else if (customId.startsWith('log_')) {
+    const command = client.commands.get('configlog');
+    if (command && typeof command.handleInteraction === 'function') {
+      try {
+        await command.handleInteraction(interaction);
+      } catch (error) {
+        console.error('Erro ao processar interação do configlog:', error);
+      }
+    }
   }
 });
 

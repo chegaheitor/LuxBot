@@ -6,7 +6,7 @@ const DB_PATH = path.resolve('database.json');
 // Inicializa o banco de dados se o arquivo não existir
 export function initDatabase() {
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [] }, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {} }, null, 2));
   } else {
     try {
       const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
@@ -15,11 +15,12 @@ export function initDatabase() {
       if (!data.recrutas) { data.recrutas = []; modified = true; }
       if (!data.farmPaineis) { data.farmPaineis = []; modified = true; }
       if (!data.farmCanais) { data.farmCanais = []; modified = true; }
+      if (!data.logChannels) { data.logChannels = {}; modified = true; }
       if (modified) {
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
       }
     } catch (e) {
-      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [] }, null, 2));
+      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {} }, null, 2));
     }
   }
 }
@@ -274,5 +275,20 @@ export function saveFarmMaterials(materials) {
 export function getFarmMaterials() {
   const db = getDatabase();
   return db.farmMaterials || ['Ferro', 'Madeira', 'Ouro', 'Dinheiro', 'Outros'];
+}
+
+// Salva o canal de log associado ao comando
+export function saveLogChannel(commandName, channelId) {
+  const db = getDatabase();
+  if (!db.logChannels) db.logChannels = {};
+  db.logChannels[commandName] = channelId;
+  return saveDatabase(db);
+}
+
+// Retorna o canal de log associado ao comando
+export function getLogChannel(commandName) {
+  const db = getDatabase();
+  if (!db.logChannels) return null;
+  return db.logChannels[commandName] || null;
 }
 

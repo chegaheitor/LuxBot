@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, RoleSelectMenuBuilder, ChannelType, PermissionFlagsBits } from 'discord.js';
 import { savePendingRecruta, updateRecrutaStatus, savePanelConfig, getPanelConfig } from '../database.js';
+import { sendLog } from '../logs.js';
 
 export const data = new SlashCommandBuilder()
   .setName('registroembed')
@@ -255,6 +256,15 @@ export async function handleInteraction(interaction) {
           embeds: [updatedEmbed],
           components: []
         });
+
+        // Enviar log de aprovação
+        const logEmbed = new EmbedBuilder()
+          .setTitle('✅ Recrutamento Aprovado')
+          .setColor(3066993)
+          .setDescription(`O administrador <@${interaction.user.id}> aprovou o pedido de set do usuário <@${userId}> (${userId}).`)
+          .addFields({ name: '💼 Cargo Adicionado:', value: `<@&${cargoId}>` })
+          .setTimestamp();
+        await sendLog(interaction.client, interaction.guild, 'registroembed', logEmbed);
       } catch (error) {
         console.error('Erro ao aceitar recrutamento:', error);
         await interaction.reply({ content: 'Ocorreu um erro ao adicionar o cargo. Verifique a hierarquia de cargos do bot.', ephemeral: true });
@@ -290,6 +300,15 @@ export async function handleInteraction(interaction) {
           embeds: [updatedEmbed],
           components: []
         });
+
+        // Enviar log de negação
+        const logEmbed = new EmbedBuilder()
+          .setTitle('❌ Recrutamento Recusado')
+          .setColor(15158332)
+          .setDescription(`O administrador <@${interaction.user.id}> recusou o pedido de set do usuário <@${userId}> (${userId}).`)
+          .addFields({ name: '📝 Motivo da Recusa:', value: motivo })
+          .setTimestamp();
+        await sendLog(interaction.client, interaction.guild, 'registroembed', logEmbed);
 
         // Enviar log de recusa
         const logsChannel = await interaction.guild.channels.fetch(canalLogsNegadoId).catch(() => null);
@@ -377,6 +396,21 @@ export async function handleInteraction(interaction) {
         if (canalPedidos) {
           await canalPedidos.send({ embeds: [responseEmbed], components: [rowSelect, rowButton] });
           await interaction.reply({ content: 'Seu pedido de set foi enviado com sucesso! Aguarde a revisão dos administradores. ✅', ephemeral: true });
+
+          // Enviar log de novo pedido
+          const logEmbed = new EmbedBuilder()
+            .setTitle('📝 Novo Pedido de Set')
+            .setColor(3447003)
+            .setDescription(`O usuário <@${user.id}> (${user.id}) solicitou recrutamento.`)
+            .addFields(
+              { name: '🔠 Nome:', value: nome, inline: true },
+              { name: '💳 ID:', value: id, inline: true },
+              { name: '📞 Telefone:', value: telefone, inline: true },
+              { name: '📋 Recrutado por:', value: recrutador, inline: true },
+              { name: '💼 Cargo Desejado:', value: cargoDesejado, inline: true }
+            )
+            .setTimestamp();
+          await sendLog(interaction.client, interaction.guild, 'registroembed', logEmbed);
         } else {
           await interaction.reply({ content: 'Erro: O canal configurado para receber os pedidos não foi encontrado.', ephemeral: true });
         }
