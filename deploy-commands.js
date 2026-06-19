@@ -31,6 +31,12 @@ const commands = [
         .setRequired(true)
         .addChannelTypes(ChannelType.GuildText)
     )
+    .addChannelOption(option =>
+      option.setName('canal_logs_negado')
+        .setDescription('O canal para onde as notificações de recusa serão enviadas')
+        .setRequired(true)
+        .addChannelTypes(ChannelType.GuildText)
+    )
 ].map(command => command.toJSON());
 
 // Preparar o cliente REST da API do Discord
