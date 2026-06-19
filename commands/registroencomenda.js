@@ -223,7 +223,7 @@ export async function handleInteraction(interaction) {
     return;
   }
 
-  // 2. Modal Submetido
+  // 2. Modal Submetido (Status: Pendente)
   if (customId === 'encomenda_nova_modal') {
     try {
       const forumId = interaction.channel.parentId;
@@ -264,23 +264,12 @@ export async function handleInteraction(interaction) {
         .setFooter({ text: 'Lux Encomendas' })
         .setTimestamp();
 
+      // Botões do Estado Pendente: Iniciar Produção e Excluir Encomenda
       const btnProduzir = new ButtonBuilder()
         .setCustomId(`encomenda_produzir_btn_${interaction.user.id}`)
         .setLabel('Iniciar Produção')
         .setStyle(ButtonStyle.Primary)
         .setEmoji('🛠️');
-
-      const btnEntregar = new ButtonBuilder()
-        .setCustomId(`encomenda_entregar_btn_${interaction.user.id}`)
-        .setLabel('Entregar Encomenda')
-        .setStyle(ButtonStyle.Success)
-        .setEmoji('✅');
-
-      const btnVoltar = new ButtonBuilder()
-        .setCustomId(`encomenda_pendente_btn_${interaction.user.id}`)
-        .setLabel('Voltar a Pendente')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('⏳');
 
       const btnExcluir = new ButtonBuilder()
         .setCustomId('encomenda_excluir_btn')
@@ -288,7 +277,7 @@ export async function handleInteraction(interaction) {
         .setStyle(ButtonStyle.Danger)
         .setEmoji('🗑️');
 
-      const rowButtons = new ActionRowBuilder().addComponents(btnProduzir, btnEntregar, btnVoltar, btnExcluir);
+      const rowButtons = new ActionRowBuilder().addComponents(btnProduzir, btnExcluir);
 
       // Criar novo tópico no fórum correspondente
       const newThread = await forumChannel.threads.create({
@@ -330,7 +319,7 @@ export async function handleInteraction(interaction) {
     return;
   }
 
-  // 3. Botão Iniciar Produção clicado
+  // 3. Botão Iniciar Produção clicado (Vai para Estado: Em Produção)
   if (customId.startsWith('encomenda_produzir_btn_')) {
     try {
       const donoId = customId.replace('encomenda_produzir_btn_', '');
@@ -388,8 +377,24 @@ export async function handleInteraction(interaction) {
         .setFooter({ text: 'Lux Encomendas' })
         .setTimestamp();
 
+      // Botões do Estado Em Produção: Entregar Encomenda e Excluir Encomenda
+      const btnEntregar = new ButtonBuilder()
+        .setCustomId(`encomenda_entregar_btn_${donoId}`)
+        .setLabel('Entregar Encomenda')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('✅');
+
+      const btnExcluir = new ButtonBuilder()
+        .setCustomId('encomenda_excluir_btn')
+        .setLabel('Excluir Encomenda')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🗑️');
+
+      const rowButtons = new ActionRowBuilder().addComponents(btnEntregar, btnExcluir);
+
       await interaction.update({
-        embeds: [updatedEmbed]
+        embeds: [updatedEmbed],
+        components: [rowButtons]
       });
 
       // Enviar log de produção
@@ -408,7 +413,7 @@ export async function handleInteraction(interaction) {
     return;
   }
 
-  // 4. Botão Entregar Encomenda clicado
+  // 4. Botão Entregar Encomenda clicado (Vai para Estado: Entregue)
   if (customId.startsWith('encomenda_entregar_btn_')) {
     try {
       const donoId = customId.replace('encomenda_entregar_btn_', '');
@@ -433,7 +438,7 @@ export async function handleInteraction(interaction) {
 
       if (!isProducing) {
         return await interaction.reply({
-          content: '❌ Você precisa iniciar a produção da encomenda (botão 🛠️ Iniciar Produção) antes de poder entregá-la!',
+          content: '❌ Esta encomenda precisa ser iniciada em produção antes de poder ser entregue!',
           ephemeral: true
         });
       }
@@ -478,17 +483,24 @@ export async function handleInteraction(interaction) {
         .setFooter({ text: 'Lux Encomendas' })
         .setTimestamp();
 
-      // Quando entregue, remove os botões de ação e deixa APENAS o botão de Excluir
+      // Botões do Estado Entregue: Voltar a Pendente e Excluir Encomenda
+      const btnVoltar = new ButtonBuilder()
+        .setCustomId(`encomenda_pendente_btn_${donoId}`)
+        .setLabel('Voltar a Pendente')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('⏳');
+
       const btnExcluir = new ButtonBuilder()
         .setCustomId('encomenda_excluir_btn')
         .setLabel('Excluir Encomenda')
         .setStyle(ButtonStyle.Danger)
         .setEmoji('🗑️');
-      const row = new ActionRowBuilder().addComponents(btnExcluir);
+
+      const rowButtons = new ActionRowBuilder().addComponents(btnVoltar, btnExcluir);
 
       await interaction.update({
         embeds: [updatedEmbed],
-        components: [row]
+        components: [rowButtons]
       });
 
       // Enviar log de entrega
@@ -507,7 +519,7 @@ export async function handleInteraction(interaction) {
     return;
   }
 
-  // 5. Botão Voltar para Pendente clicado
+  // 5. Botão Voltar para Pendente clicado (Reverte para Pendente)
   if (customId.startsWith('encomenda_pendente_btn_')) {
     try {
       const donoId = customId.replace('encomenda_pendente_btn_', '');
@@ -563,23 +575,12 @@ export async function handleInteraction(interaction) {
         .setFooter({ text: 'Lux Encomendas' })
         .setTimestamp();
 
+      // Botões do Estado Pendente: Iniciar Produção e Excluir Encomenda
       const btnProduzir = new ButtonBuilder()
         .setCustomId(`encomenda_produzir_btn_${donoId}`)
         .setLabel('Iniciar Produção')
         .setStyle(ButtonStyle.Primary)
         .setEmoji('🛠️');
-
-      const btnEntregar = new ButtonBuilder()
-        .setCustomId(`encomenda_entregar_btn_${donoId}`)
-        .setLabel('Entregar Encomenda')
-        .setStyle(ButtonStyle.Success)
-        .setEmoji('✅');
-
-      const btnVoltar = new ButtonBuilder()
-        .setCustomId(`encomenda_pendente_btn_${donoId}`)
-        .setLabel('Voltar a Pendente')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('⏳');
 
       const btnExcluir = new ButtonBuilder()
         .setCustomId('encomenda_excluir_btn')
@@ -587,7 +588,7 @@ export async function handleInteraction(interaction) {
         .setStyle(ButtonStyle.Danger)
         .setEmoji('🗑️');
 
-      const rowButtons = new ActionRowBuilder().addComponents(btnProduzir, btnEntregar, btnVoltar, btnExcluir);
+      const rowButtons = new ActionRowBuilder().addComponents(btnProduzir, btnExcluir);
 
       await interaction.update({
         embeds: [revertedEmbed],

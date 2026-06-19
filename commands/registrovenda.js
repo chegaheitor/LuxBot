@@ -349,9 +349,23 @@ export async function handleInteraction(interaction) {
         .setColor(3066993)
         .addFields({ name: '✔️ Confirmado por:', value: `<@${interaction.user.id}>`, inline: true });
 
+      const btnDesconfirmar = new ButtonBuilder()
+        .setCustomId(`venda_desconfirmar_btn_${vendedorId}`)
+        .setLabel('Desconfirmar Venda')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('↩️');
+
+      const btnExcluir = new ButtonBuilder()
+        .setCustomId('venda_excluir_btn')
+        .setLabel('Excluir Venda')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🗑️');
+
+      const rowButtons = new ActionRowBuilder().addComponents(btnDesconfirmar, btnExcluir);
+
       await interaction.update({
         embeds: [updatedEmbed],
-        components: [] // remove os botões
+        components: [rowButtons]
       });
 
       // Log de confirmação
@@ -407,5 +421,77 @@ export async function handleInteraction(interaction) {
       await interaction.reply({ content: '❌ Erro ao excluir venda.', ephemeral: true }).catch(() => null);
     }
     return;
+  }
+
+  // 5. Botão Desconfirmar Venda clicado
+  if (customId.startsWith('venda_desconfirmar_btn_')) {
+    try {
+      const vendedorId = customId.replace('venda_desconfirmar_btn_', '');
+      const forumId = interaction.channel.parentId;
+
+      const config = getVendaPanel(forumId);
+      const hasPermission = config && config.cargosPermitidosIds
+        ? config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId))
+        : interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+      if (!hasPermission) {
+        return await interaction.reply({
+          content: '❌ Você não tem permissão para desconfirmar esta venda!',
+          ephemeral: true
+        });
+      }
+
+      // Remover reação 💸
+      const reaction = interaction.message.reactions.cache.find(r => r.emoji.name === '💸');
+      if (reaction) {
+        await reaction.users.remove(interaction.client.user.id).catch(() => null);
+      }
+
+      // Reverter embed
+      const originalEmbed = interaction.message.embeds[0];
+      
+      // Remover campo "Confirmado por" do embed
+      const cleanFields = originalEmbed.fields.filter(f => !f.name.includes('Confirmado por'));
+
+      const revertedEmbed = new EmbedBuilder()
+        .setTitle('🛍️ NOVA VENDA REGISTRADA 🛍️')
+        .setDescription(originalEmbed.description || 'Mais uma venda realizada com sucesso!')
+        .addFields(cleanFields)
+        .setColor(2326507) // Cor verde original
+        .setFooter(originalEmbed.footer ? { text: originalEmbed.footer.text } : null)
+        .setTimestamp(originalEmbed.timestamp ? new Date(originalEmbed.timestamp) : null);
+
+      const btnConfirmar = new ButtonBuilder()
+        .setCustomId(`venda_confirmar_btn_${vendedorId}`)
+        .setLabel('Confirmar Venda')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('✔️');
+
+      const btnExcluir = new ButtonBuilder()
+        .setCustomId('venda_excluir_btn')
+        .setLabel('Excluir Venda')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🗑️');
+
+      const rowButtons = new ActionRowBuilder().addComponents(btnConfirmar, btnExcluir);
+
+      await interaction.update({
+        embeds: [revertedEmbed],
+        components: [rowButtons]
+      });
+
+      // Log de desconfirmação
+      const logEmbed = new EmbedBuilder()
+        .setTitle('↩️ Venda Desconfirmada')
+        .setColor(3447003)
+        .setDescription(`O administrador <@${interaction.user.id}> desconfirmou a venda de <@${vendedorId}> no fórum <#${forumId}>.`)
+        .setTimestamp();
+
+      await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
+
+    } catch (error) {
+      console.error('Erro ao desconfirmar venda:', error);
+      await interaction.reply({ content: '❌ Erro ao desconfirmar venda.', ephemeral: true }).catch(() => null);
+    }
   }
 }
