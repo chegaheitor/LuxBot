@@ -10,7 +10,7 @@ import {
   TextInputStyle, 
   ChannelType 
 } from 'discord.js';
-import { saveVendaPanel, getVendaPanel } from '../database.js';
+import { saveVendaPanel, getVendaPanel, addVenda } from '../database.js';
 import { sendLog } from '../logs.js';
 
 export const data = new SlashCommandBuilder()
@@ -288,6 +288,12 @@ export async function handleInteraction(interaction) {
           embeds: [saleEmbed],
           components: [rowButtons]
         }
+      });
+
+      // Salvar venda no banco para estatísticas do /perfil
+      addVenda(interaction.user.id, interaction.user.tag, {
+        data: dataVenda,
+        threadUrl: newThread.url
       });
 
       await interaction.reply({

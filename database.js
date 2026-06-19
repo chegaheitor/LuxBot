@@ -216,6 +216,15 @@ export function addPaidMeta(discordId, metaData) {
     paidAt: new Date().toISOString()
   });
 
+  // Também marcar no array geral de metas para histórico do /perfil
+  if (recrutas[index].metas && recrutas[index].metas.length > 0) {
+    const lastMeta = recrutas[index].metas[recrutas[index].metas.length - 1];
+    lastMeta.paga = true;
+    lastMeta.pagoPor = metaData.pagoPor;
+    lastMeta.valorPago = metaData.valor;
+    lastMeta.pagaAt = new Date().toISOString();
+  }
+
   return saveDatabase({ ...db, recrutas });
 }
 
@@ -261,10 +270,18 @@ export function removePaidMeta(discordId) {
 
   if (recrutas[index].metasPagas.length > 0) {
     recrutas[index].metasPagas.pop();
-    return saveDatabase({ ...db, recrutas });
   }
 
-  return false;
+  // Também reverter no array geral de metas para histórico do /perfil
+  if (recrutas[index].metas && recrutas[index].metas.length > 0) {
+    const lastMeta = recrutas[index].metas[recrutas[index].metas.length - 1];
+    lastMeta.paga = false;
+    delete lastMeta.pagoPor;
+    delete lastMeta.valorPago;
+    delete lastMeta.pagaAt;
+  }
+
+  return saveDatabase({ ...db, recrutas });
 }
 
 // Salva a lista de materiais customizados de farm
@@ -357,5 +374,101 @@ export function getAusenciaPanel(canalId) {
   const ausenciaPaineis = getDatabase().ausenciaPaineis || [];
   return ausenciaPaineis.find(p => p.canalId === canalId) || null;
 }
+
+// Obtém ou inicializa a ficha do membro no banco
+export function getOrCreateRecruta(userId, tag = 'Desconhecido') {
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  let recruta = recrutas.find(r => r.discordId === userId);
+
+  if (!recruta) {
+    recruta = {
+      discordId: userId,
+      tag: tag,
+      nome: 'Não registrado',
+      gameId: 'Nenhum',
+      status: 'NÃO_REGISTRADO',
+      cargo: 'Nenhum',
+      ausencias: [],
+      vendas: [],
+      encomendas: [],
+      metas: []
+    };
+    recrutas.push(recruta);
+    saveDatabase({ ...db, recrutas });
+  } else {
+    let updated = false;
+    if (!recruta.ausencias) { recruta.ausencias = []; updated = true; }
+    if (!recruta.vendas) { recruta.vendas = []; updated = true; }
+    if (!recruta.encomendas) { recruta.encomendas = []; updated = true; }
+    if (!recruta.metas) { recruta.metas = []; updated = true; }
+    if (updated) {
+      saveDatabase({ ...db, recrutas });
+    }
+  }
+  return recruta;
+}
+
+export function addAusencia(userId, tag, data) {
+  getOrCreateRecruta(userId, tag);
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  const index = recrutas.findIndex(r => r.discordId === userId);
+  if (index !== -1) {
+    if (!recrutas[index].ausencias) recrutas[index].ausencias = [];
+    recrutas[index].ausencias.push({
+      ...data,
+      timestamp: new Date().toISOString()
+    });
+    saveDatabase({ ...db, recrutas });
+  }
+}
+
+export function addVenda(userId, tag, data) {
+  getOrCreateRecruta(userId, tag);
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  const index = recrutas.findIndex(r => r.discordId === userId);
+  if (index !== -1) {
+    if (!recrutas[index].vendas) recrutas[index].vendas = [];
+    recrutas[index].vendas.push({
+      ...data,
+      timestamp: new Date().toISOString()
+    });
+    saveDatabase({ ...db, recrutas });
+  }
+}
+
+export function addEncomenda(userId, tag, data) {
+  getOrCreateRecruta(userId, tag);
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  const index = recrutas.findIndex(r => r.discordId === userId);
+  if (index !== -1) {
+    if (!recrutas[index].encomendas) recrutas[index].encomendas = [];
+    recrutas[index].encomendas.push({
+      ...data,
+      timestamp: new Date().toISOString()
+    });
+    saveDatabase({ ...db, recrutas });
+  }
+}
+
+export function addMetaDeclarada(userId, tag, data) {
+  getOrCreateRecruta(userId, tag);
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  const index = recrutas.findIndex(r => r.discordId === userId);
+  if (index !== -1) {
+    if (!recrutas[index].metas) recrutas[index].metas = [];
+    recrutas[index].metas.push({
+      ...data,
+      paga: false,
+      timestamp: new Date().toISOString()
+    });
+    saveDatabase({ ...db, recrutas });
+  }
+}
+
 
 

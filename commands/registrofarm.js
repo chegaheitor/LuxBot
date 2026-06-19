@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, ChannelType, PermissionFlagsBits } from 'discord.js';
-import { getRecrutas, saveFarmPanel, getFarmPanel, saveFarmChannel, getFarmChannel, deleteFarmChannel, hasActiveFarmChannel, getActiveFarmChannel, addConfirmedFarm, addPaidMeta, removeConfirmedFarm, removePaidMeta, getFarmMaterials } from '../database.js';
+import { getRecrutas, saveFarmPanel, getFarmPanel, saveFarmChannel, getFarmChannel, deleteFarmChannel, hasActiveFarmChannel, getActiveFarmChannel, addConfirmedFarm, addPaidMeta, removeConfirmedFarm, removePaidMeta, getFarmMaterials, addMetaDeclarada } from '../database.js';
 import { sendLog } from '../logs.js';
 
 export const data = new SlashCommandBuilder()
@@ -988,6 +988,13 @@ export async function handleInteraction(interaction) {
         if (!channelConfig) {
           return await interaction.reply({ content: 'Erro: Canal não cadastrado.', ephemeral: true });
         }
+
+        // Salvar meta declarada no banco para estatísticas de perfil
+        addMetaDeclarada(channelConfig.donoId, interaction.user.tag, {
+          item: item,
+          quantidade: quantidade,
+          data: dataStr
+        });
 
         const embed = new EmbedBuilder()
           .setTitle('✨ META BATIDA ✨')

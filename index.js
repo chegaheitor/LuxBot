@@ -146,6 +146,15 @@ client.on(Events.InteractionCreate, async interaction => {
         console.error('Erro ao processar interação do registroausencia:', error);
       }
     }
+  } else if (customId.startsWith('perfil_')) {
+    const command = client.commands.get('perfil');
+    if (command && typeof command.handleInteraction === 'function') {
+      try {
+        await command.handleInteraction(interaction);
+      } catch (error) {
+        console.error('Erro ao processar interação do perfil:', error);
+      }
+    }
   }
 });
 

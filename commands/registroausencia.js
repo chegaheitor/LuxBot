@@ -10,7 +10,7 @@ import {
   TextInputStyle, 
   ChannelType 
 } from 'discord.js';
-import { saveAusenciaPanel, getAusenciaPanel } from '../database.js';
+import { saveAusenciaPanel, getAusenciaPanel, addAusencia } from '../database.js';
 import { sendLog } from '../logs.js';
 
 export const data = new SlashCommandBuilder()
@@ -192,6 +192,12 @@ export async function handleInteraction(interaction) {
       const motivo = interaction.fields.getTextInputValue('motivo_input').trim();
       const dataRetorno = interaction.fields.getTextInputValue('data_input').trim();
       const extra = interaction.fields.getTextInputValue('extra_input').trim() || 'Nenhuma';
+
+      // Salvar ausência no banco de dados para estatísticas de perfil
+      addAusencia(interaction.user.id, interaction.user.tag, {
+        data: dataRetorno,
+        motivo: motivo
+      });
 
       const absenceEmbed = new EmbedBuilder()
         .setTitle('🔴 AUSÊNCIA REGISTRADA 🔴')

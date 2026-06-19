@@ -10,7 +10,7 @@ import {
   TextInputStyle, 
   ChannelType 
 } from 'discord.js';
-import { saveEncomendaPanel, getEncomendaPanel } from '../database.js';
+import { saveEncomendaPanel, getEncomendaPanel, addEncomenda } from '../database.js';
 import { sendLog } from '../logs.js';
 
 export const data = new SlashCommandBuilder()
@@ -286,6 +286,12 @@ export async function handleInteraction(interaction) {
           embeds: [orderEmbed],
           components: [rowButtons]
         }
+      });
+
+      // Salvar encomenda no banco para estatísticas do /perfil
+      addEncomenda(interaction.user.id, interaction.user.tag, {
+        data: dataEntrega,
+        threadUrl: newThread.url
       });
 
       await interaction.reply({
