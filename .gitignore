@@ -20,3 +20,6 @@ TUTORIAL_ORACLE.md
 
 # PASTA
 ignorar/
+
+# Banco de Dados Local
+database.json

@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, RoleSelectMenuBuilder } from 'discord.js';
 import dotenv from 'dotenv';
+import { savePendingRecruta, updateRecrutaStatus, savePanelConfig, getPanelConfig } from './database.js';
 
 // Carregar variáveis de ambiente do arquivo .env
 dotenv.config();
@@ -57,6 +58,21 @@ client.on('interactionCreate', async interaction => {
         const canalPedidos = interaction.options.getChannel('canal_pedidos');
         const canalLogsNegado = interaction.options.getChannel('canal_logs_negado');
 
+        const adminRole1 = interaction.options.getRole('cargo_admin_1');
+        const adminRole2 = interaction.options.getRole('cargo_admin_2');
+        const adminRole3 = interaction.options.getRole('cargo_admin_3');
+
+        const cargosAdminIds = [adminRole1.id];
+        if (adminRole2) cargosAdminIds.push(adminRole2.id);
+        if (adminRole3) cargosAdminIds.push(adminRole3.id);
+
+        // Salvar as configurações do painel no banco de dados local
+        savePanelConfig({
+          canalPedidosId: canalPedidos.id,
+          canalLogsNegadoId: canalLogsNegado.id,
+          cargosAdminIds: cargosAdminIds
+        });
+
         // Criação do embed inicial do painel de recrutamento
         const embed = new EmbedBuilder()
           .setTitle('✨ PEÇA SEU SET ✨')
@@ -66,7 +82,7 @@ client.on('interactionCreate', async interaction => {
             '💳 ID\n' +
             '📞 TELEFONE\n' +
             '📋 ID DE QUEM RECRUTOU\n' +
-            '💼 CARGO DESEJADO\n\n' +
+            '💼 CARGO\n\n' +
             'Seja muito bem vindo a Lux!'
           )
           .setColor(2326507)
@@ -146,7 +162,7 @@ client.on('interactionCreate', async interaction => {
 
         const cargoInput = new TextInputBuilder()
           .setCustomId('cargo_input')
-          .setLabel('💼 CARGO DESEJADO')
+          .setLabel('💼 CARGO')
           .setStyle(TextInputStyle.Short)
           .setPlaceholder('Digite o cargo que deseja (ex: Recruta, Soldado)')
           .setRequired(true);
@@ -178,40 +194,40 @@ client.on('interactionCreate', async interaction => {
         const userId = parts[0];
         const canalLogsNegadoId = parts[1];
 
-        // Modificar o embed original para indicar que foi recusado
-        const originalEmbed = interaction.message.embeds[0];
-        const updatedEmbed = EmbedBuilder.from(originalEmbed)
-          .setTitle('❌ PEDIDO DE SET NEGADO ❌')
-          .setColor(15158332); // Cor vermelha (Danger)
+        // --- VERIFICAR PERMISSÃO POR CARGOS CONFIGURADOS ---
+        const config = getPanelConfig(interaction.channelId);
+        const hasPermission = config && config.cargosAdminIds 
+          ? config.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
+          : interaction.member.permissions.has('Administrator'); // fallback se não achar config
 
-        // Responde editando a mensagem (remove os botões e atualiza texto/embed)
-        await interaction.update({
-          content: `❌ Pedido recusado por <@${interaction.user.id}>.`,
-          embeds: [updatedEmbed],
-          components: [] // Remove a lista de seleção e o botão
-        });
-
-        // Tenta buscar o canal de logs de negação e enviar a mensagem bonita
-        const logsChannel = await interaction.guild.channels.fetch(canalLogsNegadoId).catch(() => null);
-
-        if (logsChannel) {
-          const denialEmbed = new EmbedBuilder()
-            .setTitle('📢 Lux Recrutamento - Status')
-            .setDescription(
-              `Olá <@${userId}>,\n\n` +
-              `Agradecemos muito pelo seu interesse em fazer parte da **Lux**, porém o seu pedido de recrutamento foi **negado** no momento. 😔\n\n` +
-              `Não desanime! Fique de olho em novas oportunidades.`
-            )
-            .setColor(15158332)
-            .setFooter({ text: 'Lux Recrutamento' })
-            .setTimestamp();
-
-          await logsChannel.send({ content: `<@${userId}>`, embeds: [denialEmbed] });
+        if (!hasPermission) {
+          return await interaction.reply({ 
+            content: '❌ Você não tem permissão para gerenciar este recrutamento!', 
+            ephemeral: true 
+          });
         }
+        // ----------------------------------------------------
+
+        // Exibir o modal para digitar a justificativa de recusa
+        const modal = new ModalBuilder()
+          .setCustomId(`negar_modal_${userId}_${canalLogsNegadoId}`)
+          .setTitle('❌ Justificativa de Recusa ❌');
+
+        const motivoInput = new TextInputBuilder()
+          .setCustomId('motivo_input')
+          .setLabel('MOTIVO DA NEGAÇÃO')
+          .setStyle(TextInputStyle.Paragraph)
+          .setPlaceholder('Explique o motivo de recusar este recrutamento...')
+          .setRequired(true);
+
+        modal.addComponents(new ActionRowBuilder().addComponents(motivoInput));
+
+        // Exibe o modal para o administrador
+        await interaction.showModal(modal);
       } catch (error) {
-        console.error('Erro ao recusar pedido de recrutamento:', error);
+        console.error('Erro ao clicar no botão Negar:', error);
         await interaction.reply({ 
-          content: 'Ocorreu um erro ao processar a negação do recrutamento.', 
+          content: 'Ocorreu um erro ao abrir o formulário de justificativa.', 
           ephemeral: true 
         });
       }
@@ -225,6 +241,20 @@ client.on('interactionCreate', async interaction => {
         const userId = interaction.customId.replace('aprovar_select_', '');
         const cargoId = interaction.values[0]; // O ID da role selecionada
 
+        // --- VERIFICAR PERMISSÃO POR CARGOS CONFIGURADOS ---
+        const config = getPanelConfig(interaction.channelId);
+        const hasPermission = config && config.cargosAdminIds 
+          ? config.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
+          : interaction.member.permissions.has('Administrator'); // fallback
+
+        if (!hasPermission) {
+          return await interaction.reply({ 
+            content: '❌ Você não tem permissão para gerenciar este recrutamento!', 
+            ephemeral: true 
+          });
+        }
+        // ----------------------------------------------------
+
         // Obter o membro da guilda
         const member = await interaction.guild.members.fetch(userId).catch(() => null);
 
@@ -237,6 +267,18 @@ client.on('interactionCreate', async interaction => {
 
         // Tentar adicionar o cargo ao usuário
         await member.roles.add(cargoId);
+
+        // Obter o nome real da role no Discord
+        const role = interaction.guild.roles.cache.get(cargoId);
+        const cargoNome = role ? role.name : 'Cargo Atribuído';
+
+        // --- ATUALIZAR STATUS NO BANCO DE DADOS LOCAL (Atribui o cargo real do Discord) ---
+        updateRecrutaStatus(userId, 'ACEITO', {
+          cargo: cargoNome, // o cargo real do discord
+          cargoAprovadoId: cargoId,
+          processadoPorId: interaction.user.id
+        });
+        // --------------------------------------------------------------------------------------
 
         // Modificar o embed original para indicar que foi aceito
         const originalEmbed = interaction.message.embeds[0];
@@ -262,6 +304,65 @@ client.on('interactionCreate', async interaction => {
 
   // 4. Tratar submissões de modais
   if (interaction.isModalSubmit()) {
+    
+    // Tratando o modal de justificativa de recusa
+    if (interaction.customId.startsWith('negar_modal_')) {
+      try {
+        const parts = interaction.customId.replace('negar_modal_', '').split('_');
+        const userId = parts[0];
+        const canalLogsNegadoId = parts[1];
+
+        // Obtém a justificativa digitada pelo administrador
+        const motivo = interaction.fields.getTextInputValue('motivo_input');
+
+        // --- ATUALIZAR STATUS NO BANCO DE DADOS LOCAL ---
+        updateRecrutaStatus(userId, 'NEGADO', {
+          motivoRecusa: motivo,
+          processadoPorId: interaction.user.id
+        });
+        // ------------------------------------------------
+
+        // Modificar o embed original para indicar que foi recusado
+        const originalEmbed = interaction.message.embeds[0];
+        const updatedEmbed = EmbedBuilder.from(originalEmbed)
+          .setTitle('❌ PEDIDO DE SET NEGADO ❌')
+          .setColor(15158332); // Cor vermelha (Danger)
+
+        // Responde editando a mensagem do painel de revisão
+        await interaction.update({
+          content: `❌ Pedido recusado por <@${interaction.user.id}>. Motivo: *${motivo}*`,
+          embeds: [updatedEmbed],
+          components: [] // Remove o select menu e o botão
+        });
+
+        // Tenta buscar o canal de logs de negação e enviar a notificação bonita
+        const logsChannel = await interaction.guild.channels.fetch(canalLogsNegadoId).catch(() => null);
+
+        if (logsChannel) {
+          const denialEmbed = new EmbedBuilder()
+            .setTitle('📢 Lux Recrutamento - Status')
+            .setDescription(
+              `Olá <@${userId}>,\n\n` +
+              `Agradecemos muito pelo seu interesse em fazer parte da **Lux**, porém o seu pedido de recrutamento foi **negado** no momento. 😔\n\n` +
+              `📝 **Motivo:** ${motivo}\n\n` +
+              `Não desanime! Fique de olho em novas oportunidades.`
+            )
+            .setColor(15158332)
+            .setFooter({ text: 'Lux Recrutamento' })
+            .setTimestamp();
+
+          await logsChannel.send({ content: `<@${userId}>`, embeds: [denialEmbed] });
+        }
+      } catch (error) {
+        console.error('Erro ao processar submissão do modal de recusa:', error);
+        await interaction.reply({ 
+          content: 'Ocorreu um erro ao processar a recusa.', 
+          ephemeral: true 
+        });
+      }
+    }
+
+    // Tratando o modal de inscrição (pedir_set_modal_)
     if (interaction.customId.startsWith('pedir_set_modal_')) {
       try {
         // Extrai as variáveis codificadas no customId
@@ -269,7 +370,7 @@ client.on('interactionCreate', async interaction => {
         const canalPedidosId = parts[0];
         const canalLogsNegadoId = parts[1];
 
-        // Obtém as respostas digitadas pelo usuário no modal (incluindo o 5º campo)
+        // Obtém as respostas digitadas pelo usuário no modal
         const nome = interaction.fields.getTextInputValue('nome_input');
         const id = interaction.fields.getTextInputValue('id_input');
         const telefone = interaction.fields.getTextInputValue('telefone_input');
@@ -277,6 +378,19 @@ client.on('interactionCreate', async interaction => {
         const cargoDesejado = interaction.fields.getTextInputValue('cargo_input');
 
         const user = interaction.user;
+
+        // --- SALVAR NO BANCO DE DADOS LOCAL COMO PENDENTE ---
+        const recrutaData = {
+          discordId: user.id,
+          tag: user.tag,
+          nome: nome,
+          gameId: id,
+          telefone: telefone,
+          recrutadorId: recrutador,
+          cargo: cargoDesejado // Inicialmente salva o texto, será substituído pela role real ao aceitar
+        };
+        savePendingRecruta(recrutaData);
+        // ----------------------------------------------------
 
         // Criação do embed formatado com os dados e cargo selecionado
         const responseEmbed = new EmbedBuilder()
@@ -287,7 +401,7 @@ client.on('interactionCreate', async interaction => {
             `💳 ID\n${id}\n\n` +
             `📞 TELEFONE\n${telefone}\n\n` +
             `📋 ID DE QUEM RECRUTOU\n${recrutador}\n\n` +
-            `💼 CARGO DESEJADO\n${cargoDesejado}\n\n`
+            `💼 CARGO\n${cargoDesejado}\n\n`
           )
           .setColor(2326507)
           .setFooter({ text: 'Bot criado por chegaheitor © 2026' });

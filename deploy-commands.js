@@ -37,6 +37,21 @@ const commands = [
         .setRequired(true)
         .addChannelTypes(ChannelType.GuildText)
     )
+    .addRoleOption(option =>
+      option.setName('cargo_admin_1')
+        .setDescription('Cargo autorizado a gerenciar o recrutamento')
+        .setRequired(true)
+    )
+    .addRoleOption(option =>
+      option.setName('cargo_admin_2')
+        .setDescription('Segundo cargo autorizado a gerenciar o recrutamento (opcional)')
+        .setRequired(false)
+    )
+    .addRoleOption(option =>
+      option.setName('cargo_admin_3')
+        .setDescription('Terceiro cargo autorizado a gerenciar o recrutamento (opcional)')
+        .setRequired(false)
+    )
 ].map(command => command.toJSON());
 
 // Preparar o cliente REST da API do Discord
