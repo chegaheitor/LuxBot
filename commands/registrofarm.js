@@ -394,6 +394,16 @@ export async function handleInteraction(interaction) {
       }
     }
 
+    // Botão Apagar Farm (sem necessidade de permissão administrativa)
+    if (customId === 'farm_apagar_declaracao_btn') {
+      try {
+        await interaction.message.delete().catch(() => null);
+      } catch (error) {
+        console.error('Erro ao apagar declaração de farm:', error);
+      }
+      return;
+    }
+
     // Botão Bati a Meta (Membro)
     if (customId === 'farm_bati_meta_btn') {
       try {
@@ -419,7 +429,7 @@ export async function handleInteraction(interaction) {
           .setCustomId(`farm_pagar_meta_btn_${channelConfig.donoId}`)
           .setLabel('Pagar Meta')
           .setStyle(ButtonStyle.Success)
-          .setEmoji('�');
+          .setEmoji('💸');
 
         const btnIncompleta = new ButtonBuilder()
           .setCustomId(`farm_meta_incompleta_btn_${channelConfig.donoId}`)
@@ -690,7 +700,13 @@ export async function handleInteraction(interaction) {
           .setStyle(ButtonStyle.Success)
           .setEmoji('✔️');
 
-        const row = new ActionRowBuilder().addComponents(confirmBtn);
+        const deleteBtn = new ButtonBuilder()
+          .setCustomId('farm_apagar_declaracao_btn')
+          .setLabel('Apagar Farm')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('🗑️');
+
+        const row = new ActionRowBuilder().addComponents(confirmBtn, deleteBtn);
 
         await interaction.reply({ embeds: [embed], components: [row] });
       } catch (error) {
