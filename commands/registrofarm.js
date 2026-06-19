@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, ChannelType, PermissionFlagsBits } from 'discord.js';
-import { getRecrutas, saveFarmPanel, getFarmPanel, saveFarmChannel, getFarmChannel, deleteFarmChannel, hasActiveFarmChannel, getActiveFarmChannel, addConfirmedFarm, addPaidMeta, removeConfirmedFarm, removePaidMeta } from '../database.js';
+import { getRecrutas, saveFarmPanel, getFarmPanel, saveFarmChannel, getFarmChannel, deleteFarmChannel, hasActiveFarmChannel, getActiveFarmChannel, addConfirmedFarm, addPaidMeta, removeConfirmedFarm, removePaidMeta, getFarmMaterials } from '../database.js';
 
 export const data = new SlashCommandBuilder()
   .setName('registrofarm')
@@ -30,7 +30,8 @@ export const data = new SlashCommandBuilder()
     option.setName('cargo_admin_3')
       .setDescription('Terceiro cargo autorizado a gerenciar as metas e farms (opcional)')
       .setRequired(false)
-  );
+  )
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 export async function execute(interaction) {
   try {
@@ -216,17 +217,18 @@ export async function handleInteraction(interaction) {
     // Botão Adicionar Farm (Membro)
     if (customId === 'farm_adicionar_btn') {
       try {
+        const materiais = getFarmMaterials();
+        const options = materiais.map(m => ({
+          label: m,
+          description: `Farm de ${m}`,
+          value: m
+        }));
+
         // Envia o select menu de forma ephemeral
         const select = new StringSelectMenuBuilder()
           .setCustomId('farm_adicionar_select')
           .setPlaceholder('Escolha o recurso que farmou...')
-          .addOptions(
-            { label: 'Ferro', description: 'Farm de Ferro', value: 'Ferro' },
-            { label: 'Madeira', description: 'Farm de Madeira', value: 'Madeira' },
-            { label: 'Ouro', description: 'Farm de Ouro', value: 'Ouro' },
-            { label: 'Dinheiro', description: 'Farm de Dinheiro', value: 'Dinheiro' },
-            { label: 'Outros', description: 'Outro recurso não tabelado', value: 'Outros' }
-          );
+          .addOptions(options);
 
         const row = new ActionRowBuilder().addComponents(select);
 
@@ -412,16 +414,17 @@ export async function handleInteraction(interaction) {
           return await interaction.reply({ content: 'Erro: Canal não registrado no sistema.', ephemeral: true });
         }
 
+        const materiais = getFarmMaterials();
+        const options = materiais.map(m => ({
+          label: m,
+          description: `Meta de ${m}`,
+          value: m
+        }));
+
         const select = new StringSelectMenuBuilder()
           .setCustomId('farm_bati_meta_select')
           .setPlaceholder('Escolha o recurso da meta batida...')
-          .addOptions(
-            { label: 'Ferro', description: 'Meta de Ferro', value: 'Ferro' },
-            { label: 'Madeira', description: 'Meta de Madeira', value: 'Madeira' },
-            { label: 'Ouro', description: 'Meta de Ouro', value: 'Ouro' },
-            { label: 'Dinheiro', description: 'Meta de Dinheiro', value: 'Dinheiro' },
-            { label: 'Outros', description: 'Outro recurso não tabelado', value: 'Outros' }
-          );
+          .addOptions(options);
 
         const row = new ActionRowBuilder().addComponents(select);
 

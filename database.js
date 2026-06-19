@@ -262,3 +262,17 @@ export function removePaidMeta(discordId) {
 
   return false;
 }
+
+// Salva a lista de materiais customizados de farm
+export function saveFarmMaterials(materials) {
+  const db = getDatabase();
+  db.farmMaterials = materials;
+  return saveDatabase(db);
+}
+
+// Retorna a lista de materiais customizados ou o padrão
+export function getFarmMaterials() {
+  const db = getDatabase();
+  return db.farmMaterials || ['Ferro', 'Madeira', 'Ouro', 'Dinheiro', 'Outros'];
+}
+

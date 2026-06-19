@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, RoleSelectMenuBuilder, ChannelType } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, RoleSelectMenuBuilder, ChannelType, PermissionFlagsBits } from 'discord.js';
 import { savePendingRecruta, updateRecrutaStatus, savePanelConfig, getPanelConfig } from '../database.js';
 
 export const data = new SlashCommandBuilder()
@@ -36,7 +36,8 @@ export const data = new SlashCommandBuilder()
     option.setName('cargo_admin_3')
       .setDescription('Terceiro cargo autorizado a gerenciar o recrutamento (opcional)')
       .setRequired(false)
-  );
+  )
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 export async function execute(interaction) {
   try {
