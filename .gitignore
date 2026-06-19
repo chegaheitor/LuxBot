@@ -9,7 +9,7 @@ CREDENCIAIS.md
 
 # Chaves SSH
 *.key
-*.pem
+*.pub
 
 # Arquivos locais
 conectar.bat
@@ -17,3 +17,6 @@ conectar.bat
 # Documentação privada
 APAGAR_GIT.md
 TUTORIAL_ORACLE.md
+
+# PASTA
+ignorar/
