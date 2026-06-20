@@ -10,64 +10,52 @@ import {
   TextInputStyle, 
   ChannelType 
 } from 'discord.js';
-import { saveAusenciaPanel, getAusenciaPanel, addAusencia } from '../database.js';
+import { getGlobalAusenciaConfig, addAusencia } from '../database.js';
 import { sendLog } from '../logs.js';
 
 export const data = new SlashCommandBuilder()
-  .setName('registroausencia')
-  .setDescription('Envia o painel de registro de ausências para o canal selecionado.')
-  .addChannelOption(option =>
-    option.setName('canal')
-      .setDescription('O canal de texto onde as ausências serão registradas')
-      .setRequired(true)
-      .addChannelTypes(ChannelType.GuildText)
-  )
-  .addRoleOption(option =>
-    option.setName('cargo_1')
-      .setDescription('Cargo autorizado a registrar ausências')
-      .setRequired(true)
-  )
-  .addRoleOption(option =>
-    option.setName('cargo_2')
-      .setDescription('Segundo cargo autorizado a registrar ausências (opcional)')
-      .setRequired(false)
-  )
-  .addRoleOption(option =>
-    option.setName('cargo_3')
-      .setDescription('Terceiro cargo autorizado a registrar ausências (opcional)')
-      .setRequired(false)
-  )
+  .setName('criarausencia')
+  .setDescription('Cria o painel de registro de ausências no canal configurado no /painelconfig.')
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 export async function execute(interaction) {
   try {
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
-    const canal = interaction.options.getChannel('canal');
-    const role1 = interaction.options.getRole('cargo_1');
-    const role2 = interaction.options.getRole('cargo_2');
-    const role3 = interaction.options.getRole('cargo_3');
-
-    if (canal.type !== ChannelType.GuildText) {
-      return await interaction.reply({
-        content: '❌ O canal selecionado precisa ser um canal de texto padrão!',
+    const success = await criarPainelAusencia(interaction.client, interaction.guild);
+    if (success) {
+      await interaction.reply({
+        content: '✅ Painel de ausências criado com sucesso no canal configurado!',
+        ephemeral: true
+      });
+    } else {
+      await interaction.reply({
+        content: '❌ Configurações de Ausência incompletas! Configure o canal no `/painelconfig` primeiro.',
         ephemeral: true
       });
     }
+  } catch (error) {
+    console.error('Erro ao executar o comando /criarausencia:', error);
+    await interaction.reply({
+      content: '❌ Ocorreu um erro ao criar o painel de ausências.',
+      ephemeral: true
+    }).catch(() => null);
+  }
+}
 
-    const cargosPermitidosIds = [role1.id];
-    if (role2) cargosPermitidosIds.push(role2.id);
-    if (role3) cargosPermitidosIds.push(role3.id);
+export async function criarPainelAusencia(client, guild) {
+  try {
+    const config = getGlobalAusenciaConfig();
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
+    
+    if (!config || !config.canalId) return false;
 
-    // Salvar configuração no banco
-    saveAusenciaPanel({
-      canalId: canal.id,
-      cargosPermitidosIds: cargosPermitidosIds
-    });
+    const canal = guild.channels.cache.get(config.canalId)
+      || await guild.channels.fetch(config.canalId).catch(() => null);
+    if (!canal || canal.type !== ChannelType.GuildText) return false;
 
     const welcomeEmbed = new EmbedBuilder()
       .setTitle('🔴 REGISTRO DE AUSÊNCIAS 🔴')
       .setDescription(
-        'Use este painel para registrar suas ausências temporárias na corporação.\n\n' +
+        'Use este painel para registrar a sua ausência do servidor.\n\n' +
         'Clique no botão **Registrar Ausência** abaixo para abrir o formulário.'
       )
       .setColor(15158332) // Vermelho
@@ -75,66 +63,44 @@ export async function execute(interaction) {
       .setTimestamp();
 
     const btnNovaAusencia = new ButtonBuilder()
-      .setCustomId('ausencia_registrar_btn')
+      .setCustomId('ausencia_nova_btn')
       .setLabel('Registrar Ausência')
       .setStyle(ButtonStyle.Danger)
-      .setEmoji('📝');
+      .setEmoji('🔴');
 
     const row = new ActionRowBuilder().addComponents(btnNovaAusencia);
 
-    // Enviar a mensagem do painel no canal configurado
-    await canal.send({
+    const msg = await canal.send({
       embeds: [welcomeEmbed],
       components: [row]
     });
 
-    await interaction.reply({
-      content: `✅ Painel de ausências configurado com sucesso no canal ${canal}!`,
-      ephemeral: true
-    });
-
-    // Enviar log de configuração de ausência
-    const logEmbed = new EmbedBuilder()
-      .setTitle('⚙️ Painel de Ausência Configurado')
-      .setColor(3066993)
-      .setDescription(`O administrador <@${interaction.user.id}> configurou o painel de ausências no canal ${canal}.`)
-      .addFields({
-        name: '💼 Cargos Autorizados:',
-        value: cargosPermitidosIds.map(id => `<@&${id}>`).join(', ')
-      })
-      .setTimestamp();
-
-    await sendLog(interaction.client, interaction.guild, 'registroausencia', logEmbed);
-
+    await msg.pin().catch(() => null);
+    return true;
   } catch (error) {
-    console.error('Erro ao executar o comando /registroausencia:', error);
-    await interaction.reply({
-      content: '❌ Ocorreu um erro ao configurar o painel de ausências.',
-      ephemeral: true
-    });
+    console.error('Erro ao criar painel de ausência:', error);
+    return false;
   }
 }
 
-// Trata as interações iniciadas por ausencia_
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
   const dataAtual = new Date().toLocaleDateString('pt-BR');
-  const channelId = interaction.channel.id;
 
   // 1. Botão Registrar Ausência clicado
-  if (customId === 'ausencia_registrar_btn') {
+  if (customId === 'ausencia_nova_btn') {
     try {
-      const config = getAusenciaPanel(channelId);
+      const config = getGlobalAusenciaConfig();
       if (!config) {
         return await interaction.reply({
-          content: '❌ Erro: Configuração de ausências deste canal não localizada no banco de dados.',
+          content: '❌ Erro: Configuração de ausências não localizada no banco de dados.',
           ephemeral: true
         });
       }
 
       // Verificar permissão de cargos
-      const hasPermission = config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId))
+      const hasPermission = (config.cargosPermitidosIds && config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId)))
         || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
       if (!hasPermission) {
@@ -205,7 +171,7 @@ export async function handleInteraction(interaction) {
         .setTitle('🔴 AUSÊNCIA REGISTRADA 🔴')
         .setDescription('Um membro registrou ausência temporária.')
         .addFields(
-          { name: '👤 Membro:', value: `<@${interaction.user.id}>`, inline: true },
+          { name: '👥 Membro:', value: `<@${interaction.user.id}>`, inline: true },
           { name: '📅 Ausente até:', value: dataRetorno, inline: true },
           { name: '📝 Motivo:', value: motivo, inline: false },
           { name: 'ℹ️ Informações Extras:', value: extra, inline: false },
@@ -219,15 +185,14 @@ export async function handleInteraction(interaction) {
         .setCustomId(`ausencia_voltou_btn_${interaction.user.id}`)
         .setLabel('Voltei da Ausência')
         .setStyle(ButtonStyle.Success)
-        .setEmoji('🟢');
+        .setEmoji('🏢');
 
       const rowButtons = new ActionRowBuilder().addComponents(btnVoltou);
 
       // Envia o embed na sala em que o botão foi clicado
-      const message = await interaction.reply({
+      await interaction.reply({
         embeds: [absenceEmbed],
-        components: [rowButtons],
-        fetchReply: true
+        components: [rowButtons]
       });
 
       // Enviar log de nova ausência
@@ -236,7 +201,7 @@ export async function handleInteraction(interaction) {
         .setColor(15158332)
         .setDescription(`O membro <@${interaction.user.id}> registrou ausência.`)
         .addFields(
-          { name: '👤 Membro:', value: `<@${interaction.user.id}>`, inline: true },
+          { name: '👥 Membro:', value: `<@${interaction.user.id}>`, inline: true },
           { name: '📅 Ausente até:', value: dataRetorno, inline: true },
           { name: '📝 Motivo:', value: motivo, inline: false }
         )
@@ -258,10 +223,10 @@ export async function handleInteraction(interaction) {
   if (customId.startsWith('ausencia_voltou_btn_')) {
     try {
       const ausenteUserId = customId.replace('ausencia_voltou_btn_', '');
-      const config = getAusenciaPanel(channelId);
+      const config = getGlobalAusenciaConfig();
 
       const hasPermission = interaction.user.id === ausenteUserId
-        || (config && config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId)))
+        || (config && config.cargosPermitidosIds && config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId)))
         || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
       if (!hasPermission) {
@@ -282,7 +247,7 @@ export async function handleInteraction(interaction) {
       // Reformatar os campos e atualizar o status
       const updatedFields = originalEmbed.fields.map(field => {
         if (field.name.toLowerCase().includes('status')) {
-          return { name: 'ℹ️ Status:', value: '🟢 Ativo / De Volta', inline: true };
+          return { name: 'ℹ️ Status:', value: '🏢 Ativo / De Volta', inline: true };
         }
         return field;
       });
@@ -297,7 +262,7 @@ export async function handleInteraction(interaction) {
       });
 
       const updatedEmbed = EmbedBuilder.from(originalEmbed)
-        .setTitle('🟢 RETORNO DE AUSÊNCIA 🟢')
+        .setTitle('🏢 RETORNO DE AUSÊNCIA 🏢')
         .setDescription('O membro retornou e está ativo novamente.')
         .setFields(updatedFields)
         .setColor(3066993) // Verde
@@ -310,7 +275,7 @@ export async function handleInteraction(interaction) {
 
       // Enviar log de retorno de ausência
       const logEmbed = new EmbedBuilder()
-        .setTitle('🟢 Retorno de Ausência')
+        .setTitle('🏢 Retorno de Ausência')
         .setColor(3066993)
         .setDescription(`O membro <@${ausenteUserId}> retornou da sua ausência.`)
         .addFields({

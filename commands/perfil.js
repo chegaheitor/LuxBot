@@ -2,10 +2,12 @@ import {
   SlashCommandBuilder, 
   EmbedBuilder, 
   ActionRowBuilder, 
-  StringSelectMenuBuilder, 
+  ButtonBuilder, 
+  ButtonStyle, 
   PermissionFlagsBits 
 } from 'discord.js';
-import { getOrCreateRecruta, getActiveFarmChannel } from '../database.js';
+import { getOrCreateRecruta, getActiveFarmChannel, deleteRecruta } from '../database.js';
+import { sendLog } from '../logs.js';
 
 export const data = new SlashCommandBuilder()
   .setName('perfil')
@@ -16,196 +18,46 @@ export const data = new SlashCommandBuilder()
       .setRequired(true)
   );
 
-// Cria o menu de seleção que serve como abas
-function createStatsMenu(targetUserId, executorId, selectedValue = 'principal') {
-  const selectMenu = new StringSelectMenuBuilder()
-    .setCustomId(`perfil_stats_select_${targetUserId}_${executorId}`)
-    .setPlaceholder('Selecione uma aba para visualizar...')
-    .addOptions([
-      { 
-        label: 'Perfil Principal', 
-        value: 'principal', 
-        emoji: '👤', 
-        description: 'Dados cadastrais do membro',
-        default: selectedValue === 'principal'
-      },
-      { 
-        label: 'Histórico de Ausências', 
-        value: 'ausencias', 
-        emoji: '🔴', 
-        description: 'Ausências e datas de retorno',
-        default: selectedValue === 'ausencias'
-      },
-      { 
-        label: 'Histórico de Vendas', 
-        value: 'vendas', 
-        emoji: '🛍️', 
-        description: 'Lista de vendas registradas',
-        default: selectedValue === 'vendas'
-      },
-      { 
-        label: 'Histórico de Encomendas', 
-        value: 'encomendas', 
-        emoji: '📦', 
-        description: 'Lista de encomendas do membro',
-        default: selectedValue === 'encomendas'
-      },
-      { 
-        label: 'Metas de Farm', 
-        value: 'metas', 
-        emoji: '🛠️', 
-        description: 'Metas declaradas e status de pagamento',
-        default: selectedValue === 'metas'
-      },
-      { 
-        label: 'Advertências', 
-        value: 'advertencias', 
-        emoji: '⚠️', 
-        description: 'Histórico de advertências do membro',
-        default: selectedValue === 'advertencias'
-      }
-    ]);
-
-  return new ActionRowBuilder().addComponents(selectMenu);
-}
-
-// Gera o Embed específico para cada aba selecionada
-export function generatePerfilEmbed(targetUser, recruta, tab = 'principal') {
+// Gera o Embed unificado do perfil
+export function generatePerfilEmbed(targetUser, recruta) {
   const avatarUrl = targetUser.displayAvatarURL({ dynamic: true, size: 256 });
   const dataAtual = new Date().toLocaleDateString('pt-BR');
+  
+  const farmChannel = getActiveFarmChannel(targetUser.id);
+  const farmFolderStr = farmChannel ? `<#${farmChannel.canalId}>` : '❌ Nenhuma pasta ativa';
+
+  const activeWarnings = recruta.warnings ? recruta.warnings.filter(w => w.active).length : 0;
+  const totalAusencias = recruta.ausencias ? recruta.ausencias.length : 0;
+  const totalVendas = recruta.vendas ? recruta.vendas.length : 0;
+  const totalEncomendas = recruta.encomendas ? recruta.encomendas.length : 0;
+  const totalMetas = recruta.metas ? recruta.metas.length : 0;
+
   const embed = new EmbedBuilder()
     .setAuthor({ name: `Perfil de ${targetUser.username}`, iconURL: avatarUrl })
+    .setTitle('👤 PERFIL DO MEMBRO 👤')
     .setThumbnail(avatarUrl)
+    .setDescription('Informações de registro de membro e histórico de atividades no banco de dados da Lux.')
+    .setColor(3447003) // Azul
+    .addFields(
+      { name: '🔠 Nome Personagem', value: recruta.nome || 'Não registrado', inline: true },
+      { name: '💳 ID no Jogo', value: recruta.gameId || 'Nenhum', inline: true },
+      { name: '💼 Cargo na Guilda', value: recruta.cargo || 'Nenhum', inline: true },
+      { name: '✨ Status do Set', value: recruta.status || 'NÃO_REGISTRADO', inline: true },
+      { name: '📞 Telefone', value: recruta.telefone || 'Não informado', inline: true },
+      { name: '📋 Recrutador (ID)', value: recruta.recrutadorId || 'Não informado', inline: true },
+      { name: '📁 Pasta de Farm', value: farmFolderStr, inline: false },
+      { 
+        name: '📊 Estatísticas de Atividade', 
+        value: 
+          `• ⚠️ **Advertências Ativas:** \`${activeWarnings} / 3\`\n` +
+          `• 🌾 **Metas de Farm:** \`${totalMetas}\` meta(s) declarada(s)\n` +
+          `• 🔴 **Ausências:** \`${totalAusencias}\` registro(s)\n` +
+          `• 🛍️ **Vendas:** \`${totalVendas}\` venda(s)\n` +
+          `• 📦 **Encomendas:** \`${totalEncomendas}\` encomenda(s)`
+      }
+    )
+    .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` })
     .setTimestamp();
-
-  if (tab === 'principal') {
-    const farmChannel = getActiveFarmChannel(targetUser.id);
-    const farmFolderStr = farmChannel ? `<#${farmChannel.canalId}>` : '❌ Nenhuma pasta ativa';
-
-    embed
-      .setTitle('👤 DADOS CADASTRAIS 👤')
-      .setDescription('Informações de registro de membro no banco de dados da Lux.')
-      .setColor(3447003) // Azul
-      .addFields(
-        { name: '🔠 Nome Personagem:', value: recruta.nome || 'Não registrado', inline: true },
-        { name: '💳 ID no Jogo:', value: recruta.gameId || 'Nenhum', inline: true },
-        { name: '💼 Cargo na Guilda:', value: recruta.cargo || 'Nenhum', inline: true },
-        { name: '✨ Status do Set:', value: recruta.status || 'NÃO_REGISTRADO', inline: true },
-        { name: '📞 Telefone:', value: recruta.telefone || 'Não informado', inline: true },
-        { name: '📋 Recrutador (ID):', value: recruta.recrutadorId || 'Não informado', inline: true },
-        { name: '📁 Pasta de Farm:', value: farmFolderStr, inline: false }
-      )
-      .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` });
-  }
-
-  else if (tab === 'ausencias') {
-    const count = recruta.ausencias ? recruta.ausencias.length : 0;
-    embed
-      .setTitle('🔴 HISTÓRICO DE AUSÊNCIAS 🔴')
-      .setDescription(`Registro de ausências temporárias solicitadas pelo membro.\n\n**📊 Total de Ausências:** \`${count}\``)
-      .setColor(15158332) // Vermelho
-      .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` });
-
-    if (count > 0) {
-      const list = recruta.ausencias.slice(-5).reverse().map((a, i) => {
-        return `**${i + 1}. Ausente até:** ${a.data}\n   **Motivo:** ${a.motivo}`;
-      }).join('\n\n');
-      embed.addFields({ name: '📅 Últimos Registros:', value: list });
-    } else {
-      embed.addFields({ name: '📅 Últimos Registros:', value: 'Nenhuma ausência registrada.' });
-    }
-  }
-
-  else if (tab === 'vendas') {
-    const count = recruta.vendas ? recruta.vendas.length : 0;
-    embed
-      .setTitle('🛍️ HISTÓRICO DE VENDAS 🛍️')
-      .setDescription(`Vendas faturadas e cadastradas no fórum de vendas.\n\n**📊 Total de Vendas:** \`${count}\``)
-      .setColor(3066993) // Verde
-      .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` });
-
-    if (count > 0) {
-      const list = recruta.vendas.slice(-5).reverse().map((v, i) => {
-        return `**${i + 1}. Data:** ${v.data}\n   **Tópico:** [Acessar Venda](${v.threadUrl})`;
-      }).join('\n\n');
-      embed.addFields({ name: '🛒 Últimas Vendas:', value: list });
-    } else {
-      embed.addFields({ name: '🛒 Últimas Vendas:', value: 'Nenhuma venda registrada.' });
-    }
-  }
-
-  else if (tab === 'encomendas') {
-    const count = recruta.encomendas ? recruta.encomendas.length : 0;
-    embed
-      .setTitle('📦 HISTÓRICO DE ENCOMENDAS 📦')
-      .setDescription(`Encomendas faturadas e organizadas no fórum de encomendas.\n\n**📊 Total de Encomendas:** \`${count}\``)
-      .setColor(15844367) // Amarelo/Dourado
-      .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` });
-
-    if (count > 0) {
-      const list = recruta.encomendas.slice(-5).reverse().map((e, i) => {
-        return `**${i + 1}. Data:** ${e.data}\n   **Tópico:** [Acessar Encomenda](${e.threadUrl})`;
-      }).join('\n\n');
-      embed.addFields({ name: '🎁 Últimas Encomendas:', value: list });
-    } else {
-      embed.addFields({ name: '🎁 Últimas Encomendas:', value: 'Nenhuma encomenda registrada.' });
-    }
-  }
-
-  else if (tab === 'metas') {
-    const count = recruta.metas ? recruta.metas.length : 0;
-    embed
-      .setTitle('🛠️ HISTÓRICO DE METAS 🛠️')
-      .setDescription(`Registro de metas de farm batidas declaradas e status de pagamento.\n\n**📊 Total de Metas:** \`${count}\``)
-      .setColor(10181046) // Roxo
-      .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` });
-
-    if (count > 0) {
-      const list = recruta.metas.slice(-5).reverse().map((m, i) => {
-        const payStatus = m.paga 
-          ? `✅ Pago em ${m.pagaAt ? new Date(m.pagaAt).toLocaleDateString('pt-BR') : ''} por <@${m.pagoPor}>` 
-          : '❌ Pendente de confirmação/pagamento';
-        return `**${i + 1}. Recurso:** ${m.item} (${m.quantidade})\n   **Data:** ${m.data}\n   **Status:** ${payStatus}`;
-      }).join('\n\n');
-      embed.addFields({ name: '📈 Últimas Metas Batidas:', value: list });
-    } else {
-      embed.addFields({ name: '📈 Últimas Metas Batidas:', value: 'Nenhuma meta batida declarada.' });
-    }
-  }
-
-  else if (tab === 'advertencias') {
-    const activeCount = recruta.warnings ? recruta.warnings.filter(w => w.active).length : 0;
-    embed
-      .setTitle('⚠️ HISTÓRICO DE ADVERTÊNCIAS ⚠️')
-      .setDescription(`Histórico completo de advertências oficiais.\n\n**📊 Advertências Ativas:** \`${activeCount} / 3\``)
-      .setColor(15105570) // Laranja/Vermelho
-      .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` });
-
-    if (recruta.warnings && recruta.warnings.length > 0) {
-      const list = recruta.warnings.slice(-5).reverse().map((w, i) => {
-        const dateStr = w.timestamp ? new Date(w.timestamp).toLocaleDateString('pt-BR') : 'Data desconhecida';
-        if (w.active) {
-          let details = `**${i + 1}. ⚠️ Nível ${w.countAfter} / 3** (Aplicado por <@${w.authorId}> em ${dateStr})\n   **Motivo:** ${w.reason}\n   **Validade:** ${w.ateQuando || 'Não informada'}`;
-          if (w.revocationAttempt && w.revocationAttempt.denied) {
-            const deniedDate = w.revocationAttempt.deniedAt ? new Date(w.revocationAttempt.deniedAt).toLocaleDateString('pt-BR') : '';
-            details += `\n   *⚖️ Revogação Negada por <@${w.revocationAttempt.deniedBy}> em ${deniedDate}*\n   *Motivo:* ${w.revocationAttempt.deniedReason}`;
-          }
-          return details;
-        } else {
-          const removedDateStr = w.removedAt ? new Date(w.removedAt).toLocaleDateString('pt-BR') : '';
-          if (w.revoked) {
-            const revokedDateStr = w.revokedAt ? new Date(w.revokedAt).toLocaleDateString('pt-BR') : '';
-            return `**${i + 1}. ~~⚠️ Nível ${w.countAfter} / 3~~** (Aplicado por <@${w.authorId}>)\n   **⚖️ REVOGADA** por <@${w.revokedBy}> em ${revokedDateStr}`;
-          } else {
-            return `**${i + 1}. ~~⚠️ Nível ${w.countAfter} / 3~~** (Aplicado por <@${w.authorId}>)\n   **❌ REMOVIDA** por <@${w.removedBy}> em ${removedDateStr}\n   **Motivo da Remoção:** *${w.removedReason}*`;
-          }
-        }
-      }).join('\n\n');
-      embed.addFields({ name: '📝 Registros Recentes:', value: list });
-    } else {
-      embed.addFields({ name: '📝 Registros Recentes:', value: 'Nenhuma advertência registrada para este membro.' });
-    }
-  }
 
   return embed;
 }
@@ -215,8 +67,16 @@ export async function execute(interaction) {
     const targetUser = interaction.options.getUser('membro');
     const recruta = getOrCreateRecruta(targetUser.id, targetUser.tag);
 
-    const embed = generatePerfilEmbed(targetUser, recruta, 'principal');
-    const row = createStatsMenu(targetUser.id, interaction.user.id, 'principal');
+    const embed = generatePerfilEmbed(targetUser, recruta);
+    
+    // Botão de Excluir Perfil
+    const deleteBtn = new ButtonBuilder()
+      .setCustomId(`perfil_deletar_btn_${targetUser.id}`)
+      .setLabel('Apagar Perfil')
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji('🗑️');
+
+    const row = new ActionRowBuilder().addComponents(deleteBtn);
 
     await interaction.reply({
       embeds: [embed],
@@ -235,46 +95,161 @@ export async function execute(interaction) {
 // Trata as interações iniciadas por perfil_
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
+  const guild = interaction.guild;
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
 
-  if (customId.startsWith('perfil_stats_select_')) {
+  // 1. Clique no botão de Apagar Perfil
+  if (customId.startsWith('perfil_deletar_btn_')) {
     try {
-      const parts = customId.replace('perfil_stats_select_', '').split('_');
-      const targetUserId = parts[0];
-      const executorId = parts[1];
+      const targetUserId = customId.replace('perfil_deletar_btn_', '');
 
-      // Apenas quem iniciou o comando pode interagir com o select menu
-      if (interaction.user.id !== executorId) {
+      // Verificar permissão: somente o próprio usuário ou administradores
+      const isSelf = interaction.user.id === targetUserId;
+      const isAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+      if (!isSelf && !isAdmin) {
         return await interaction.reply({
-          content: '❌ Apenas quem executou o comando `/perfil` pode interagir com este menu!',
+          content: '❌ Apenas o próprio membro ou administradores podem apagar este perfil!',
           ephemeral: true
         });
       }
 
-      const selectedTab = interaction.values[0];
-      const targetUser = await interaction.client.users.fetch(targetUserId).catch(() => null);
+      // Embed de confirmação de exclusão
+      const confirmEmbed = new EmbedBuilder()
+        .setTitle('⚠️ CONFIRMAÇÃO DE EXCLUSÃO ⚠️')
+        .setDescription(
+          `Você está prestes a apagar o perfil do usuário <@${targetUserId}> (${targetUserId}).\n\n` +
+          `**Esta ação é irreversível!** Todos os dados cadastrais, logs de ausências, farms, vendas, encomendas e advertências desse membro serão permanentemente removidos.`
+        )
+        .setColor(15158332) // Vermelho
+        .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` })
+        .setTimestamp();
 
-      if (!targetUser) {
-        return await interaction.reply({
-          content: '❌ Não foi possível carregar as informações do usuário solicitado.',
-          ephemeral: true
-        });
-      }
+      const btnConfirmar = new ButtonBuilder()
+        .setCustomId(`perfil_deletar_confirmar_${targetUserId}_${interaction.user.id}`)
+        .setLabel('Confirmar Exclusão')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('✅');
 
-      const recruta = getOrCreateRecruta(targetUserId, targetUser.tag);
-      const updatedEmbed = generatePerfilEmbed(targetUser, recruta, selectedTab);
-      const row = createStatsMenu(targetUserId, executorId, selectedTab);
+      const btnCancelar = new ButtonBuilder()
+        .setCustomId(`perfil_deletar_cancelar_${targetUserId}_${interaction.user.id}`)
+        .setLabel('Cancelar')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('✖️');
+
+      const row = new ActionRowBuilder().addComponents(btnConfirmar, btnCancelar);
 
       await interaction.update({
-        embeds: [updatedEmbed],
+        embeds: [confirmEmbed],
         components: [row]
       });
 
     } catch (error) {
-      console.error('Erro ao processar alteração de aba do perfil:', error);
+      console.error('Erro ao processar clique em apagar perfil:', error);
       await interaction.reply({
-        content: '❌ Ocorreu um erro ao atualizar o perfil.',
+        content: '❌ Ocorreu um erro ao abrir a confirmação de exclusão.',
         ephemeral: true
       }).catch(() => null);
     }
+    return;
+  }
+
+  // 2. Confirmação de Exclusão
+  if (customId.startsWith('perfil_deletar_confirmar_')) {
+    try {
+      const parts = customId.replace('perfil_deletar_confirmar_', '').split('_');
+      const targetUserId = parts[0];
+      const executorId = parts[1];
+
+      // Apenas quem iniciou o processo de exclusão pode confirmar
+      if (interaction.user.id !== executorId) {
+        return await interaction.reply({
+          content: '❌ Apenas o usuário que iniciou a exclusão pode confirmar esta ação!',
+          ephemeral: true
+        });
+      }
+
+      // Executar exclusão do banco
+      deleteRecruta(targetUserId);
+
+      const successEmbed = new EmbedBuilder()
+        .setTitle('✅ PERFIL EXCLUÍDO ✅')
+        .setDescription(`O perfil do usuário <@${targetUserId}> foi apagado com sucesso do banco de dados do LuxBot.`)
+        .setColor(3066993) // Verde
+        .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` })
+        .setTimestamp();
+
+      await interaction.update({
+        embeds: [successEmbed],
+        components: []
+      });
+
+      // Enviar log de exclusão de perfil
+      const logEmbed = new EmbedBuilder()
+        .setTitle('🗑️ Perfil Excluído')
+        .setColor(15158332)
+        .setDescription(`O administrador/membro <@${interaction.user.id}> excluiu permanentemente a ficha de cadastro de <@${targetUserId}> (${targetUserId}).`)
+        .setTimestamp();
+
+      await sendLog(interaction.client, guild, 'perfil', logEmbed);
+
+    } catch (error) {
+      console.error('Erro ao confirmar exclusão de perfil:', error);
+      await interaction.reply({
+        content: '❌ Ocorreu um erro ao excluir o perfil do membro.',
+        ephemeral: true
+      }).catch(() => null);
+    }
+    return;
+  }
+
+  // 3. Cancelamento de Exclusão
+  if (customId.startsWith('perfil_deletar_cancelar_')) {
+    try {
+      const parts = customId.replace('perfil_deletar_cancelar_', '').split('_');
+      const targetUserId = parts[0];
+      const executorId = parts[1];
+
+      // Apenas quem iniciou o processo de exclusão pode cancelar
+      if (interaction.user.id !== executorId) {
+        return await interaction.reply({
+          content: '❌ Apenas o usuário que iniciou a exclusão pode cancelar esta ação!',
+          ephemeral: true
+        });
+      }
+
+      const targetUser = await interaction.client.users.fetch(targetUserId).catch(() => null);
+      if (!targetUser) {
+        return await interaction.update({
+          content: '❌ Não foi possível carregar as informações do usuário para restaurar o perfil.',
+          embeds: [],
+          components: []
+        });
+      }
+
+      const recruta = getOrCreateRecruta(targetUserId, targetUser.tag);
+      const embed = generatePerfilEmbed(targetUser, recruta);
+
+      const deleteBtn = new ButtonBuilder()
+        .setCustomId(`perfil_deletar_btn_${targetUserId}`)
+        .setLabel('Apagar Perfil')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🗑️');
+
+      const row = new ActionRowBuilder().addComponents(deleteBtn);
+
+      await interaction.update({
+        embeds: [embed],
+        components: [row]
+      });
+
+    } catch (error) {
+      console.error('Erro ao cancelar exclusão de perfil:', error);
+      await interaction.reply({
+        content: '❌ Ocorreu um erro ao restaurar o perfil.',
+        ephemeral: true
+      }).catch(() => null);
+    }
+    return;
   }
 }

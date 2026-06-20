@@ -99,66 +99,48 @@ client.on(Events.InteractionCreate, async interaction => {
 
   // Roteamento de interações baseado em prefixos
   if (customId.startsWith('embed_')) {
-    const command = client.commands.get('registroembed');
+    const command = client.commands.get('criarrecrutamento');
     if (command && typeof command.handleInteraction === 'function') {
       try {
         await command.handleInteraction(interaction);
       } catch (error) {
-        console.error('Erro ao processar interação do registroembed:', error);
+        console.error('Erro ao processar interação do criarrecrutamento:', error);
       }
     }
   } else if (customId.startsWith('farm_')) {
-    const command = client.commands.get('registrofarm');
+    const command = client.commands.get('criarfarm');
     if (command && typeof command.handleInteraction === 'function') {
       try {
         await command.handleInteraction(interaction);
       } catch (error) {
-        console.error('Erro ao processar interação do registrofarm:', error);
-      }
-    }
-  } else if (customId.startsWith('configfarm_')) {
-    const command = client.commands.get('configfarm');
-    if (command && typeof command.handleInteraction === 'function') {
-      try {
-        await command.handleInteraction(interaction);
-      } catch (error) {
-        console.error('Erro ao processar interação do configfarm:', error);
-      }
-    }
-  } else if (customId.startsWith('log_')) {
-    const command = client.commands.get('configlog');
-    if (command && typeof command.handleInteraction === 'function') {
-      try {
-        await command.handleInteraction(interaction);
-      } catch (error) {
-        console.error('Erro ao processar interação do configlog:', error);
+        console.error('Erro ao processar interação do criarfarm:', error);
       }
     }
   } else if (customId.startsWith('venda_')) {
-    const command = client.commands.get('registrovenda');
+    const command = client.commands.get('criarvenda');
     if (command && typeof command.handleInteraction === 'function') {
       try {
         await command.handleInteraction(interaction);
       } catch (error) {
-        console.error('Erro ao processar interação do registrovenda:', error);
+        console.error('Erro ao processar interação do criarvenda:', error);
       }
     }
   } else if (customId.startsWith('encomenda_')) {
-    const command = client.commands.get('registroencomenda');
+    const command = client.commands.get('criarencomenda');
     if (command && typeof command.handleInteraction === 'function') {
       try {
         await command.handleInteraction(interaction);
       } catch (error) {
-        console.error('Erro ao processar interação do registroencomenda:', error);
+        console.error('Erro ao processar interação do criarencomenda:', error);
       }
     }
   } else if (customId.startsWith('ausencia_')) {
-    const command = client.commands.get('registroausencia');
+    const command = client.commands.get('criarausencia');
     if (command && typeof command.handleInteraction === 'function') {
       try {
         await command.handleInteraction(interaction);
       } catch (error) {
-        console.error('Erro ao processar interação do registroausencia:', error);
+        console.error('Erro ao processar interação do criarausencia:', error);
       }
     }
   } else if (customId.startsWith('perfil_')) {
@@ -170,22 +152,13 @@ client.on(Events.InteractionCreate, async interaction => {
         console.error('Erro ao processar interação do perfil:', error);
       }
     }
-  } else if (customId.startsWith('bau_')) {
-    const command = client.commands.get('registrobau');
+  } else if (customId.startsWith('bau_') || customId.startsWith('listarbau_')) {
+    const command = client.commands.get('listarbau');
     if (command && typeof command.handleInteraction === 'function') {
       try {
         await command.handleInteraction(interaction);
       } catch (error) {
-        console.error('Erro ao processar interação do registrobau:', error);
-      }
-    }
-  } else if (customId.startsWith('configitemsbau_')) {
-    const command = client.commands.get('configitemsbau');
-    if (command && typeof command.handleInteraction === 'function') {
-      try {
-        await command.handleInteraction(interaction);
-      } catch (error) {
-        console.error('Erro ao processar interação do configitemsbau:', error);
+        console.error('Erro ao processar interação do listarbau:', error);
       }
     }
   } else if (customId.startsWith('adv_')) {
@@ -197,13 +170,13 @@ client.on(Events.InteractionCreate, async interaction => {
         console.error('Erro ao processar interação do adv:', error);
       }
     }
-  } else if (customId.startsWith('listarbau_')) {
-    const command = client.commands.get('listarbau');
+  } else if (customId.startsWith('painelconfig_')) {
+    const command = client.commands.get('painelconfig');
     if (command && typeof command.handleInteraction === 'function') {
       try {
         await command.handleInteraction(interaction);
       } catch (error) {
-        console.error('Erro ao processar interação do listarbau:', error);
+        console.error('Erro ao processar interação do painelconfig:', error);
       }
     }
   }

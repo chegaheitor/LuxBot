@@ -10,65 +10,47 @@ import {
   TextInputStyle, 
   ChannelType 
 } from 'discord.js';
-import { saveVendaPanel, getVendaPanel, addVenda } from '../database.js';
+import { getGlobalVendaConfig, addVenda } from '../database.js';
 import { sendLog } from '../logs.js';
 
 export const data = new SlashCommandBuilder()
-  .setName('registrovenda')
-  .setDescription('Envia o painel de registro de vendas para o fórum selecionado.')
-  .addChannelOption(option =>
-    option.setName('canal_forum')
-      .setDescription('O canal de fórum onde as vendas serão registradas')
-      .setRequired(true)
-      .addChannelTypes(ChannelType.GuildForum)
-  )
-  .addRoleOption(option =>
-    option.setName('cargo_1')
-      .setDescription('Cargo autorizado a registrar vendas')
-      .setRequired(true)
-  )
-  .addRoleOption(option =>
-    option.setName('cargo_2')
-      .setDescription('Segundo cargo autorizado a registrar vendas (opcional)')
-      .setRequired(false)
-  )
-  .addRoleOption(option =>
-    option.setName('cargo_3')
-      .setDescription('Terceiro cargo autorizado a registrar vendas (opcional)')
-      .setRequired(false)
-  )
-  .addRoleOption(option =>
-    option.setName('cargo_4')
-      .setDescription('Quarto cargo autorizado a registrar vendas (opcional)')
-      .setRequired(false)
-  )
+  .setName('criarvenda')
+  .setDescription('Cria o painel de registro de vendas no fórum configurado no /painelconfig.')
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 export async function execute(interaction) {
   try {
-    const canalForum = interaction.options.getChannel('canal_forum');
-    const role1 = interaction.options.getRole('cargo_1');
-    const role2 = interaction.options.getRole('cargo_2');
-    const role3 = interaction.options.getRole('cargo_3');
-    const role4 = interaction.options.getRole('cargo_4');
-
-    if (canalForum.type !== ChannelType.GuildForum) {
-      return await interaction.reply({
-        content: '❌ O canal selecionado precisa ser do tipo **Fórum**!',
+    const success = await criarPainelVenda(interaction.client, interaction.guild);
+    if (success) {
+      await interaction.reply({
+        content: '✅ Painel de vendas criado com sucesso no fórum configurado!',
+        ephemeral: true
+      });
+    } else {
+      await interaction.reply({
+        content: '❌ Configurações de Vendas incompletas! Configure o canal de fórum no `/painelconfig` primeiro.',
         ephemeral: true
       });
     }
+  } catch (error) {
+    console.error('Erro ao executar o comando /criarvenda:', error);
+    await interaction.reply({
+      content: '❌ Ocorreu um erro ao criar o painel de vendas.',
+      ephemeral: true
+    }).catch(() => null);
+  }
+}
 
-    const cargosPermitidosIds = [role1.id];
-    if (role2) cargosPermitidosIds.push(role2.id);
-    if (role3) cargosPermitidosIds.push(role3.id);
-    if (role4) cargosPermitidosIds.push(role4.id);
+export async function criarPainelVenda(client, guild) {
+  try {
+    const config = getGlobalVendaConfig();
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
+    
+    if (!config || !config.forumCanalId) return false;
 
-    // Salvar configuração no banco
-    saveVendaPanel({
-      forumCanalId: canalForum.id,
-      cargosPermitidosIds: cargosPermitidosIds
-    });
+    const canalForum = guild.channels.cache.get(config.forumCanalId)
+      || await guild.channels.fetch(config.forumCanalId).catch(() => null);
+    if (!canalForum || canalForum.type !== ChannelType.GuildForum) return false;
 
     const welcomeEmbed = new EmbedBuilder()
       .setTitle('🛒 REGISTRO DE VENDAS 🛒')
@@ -88,7 +70,6 @@ export async function execute(interaction) {
 
     const row = new ActionRowBuilder().addComponents(btnNovaVenda);
 
-    // Criar o tópico inicial do Painel de Vendas no canal do Fórum
     const thread = await canalForum.threads.create({
       name: '🛒┃Painel de Vendas',
       message: {
@@ -97,50 +78,26 @@ export async function execute(interaction) {
       }
     });
 
-    // Fixar o tópico criado no Fórum
     await thread.pin().catch(() => null);
-
-    await interaction.reply({
-      content: `✅ Painel de vendas configurado e publicado com sucesso no fórum! Acesse o tópico: ${thread}`,
-      ephemeral: true
-    });
-
-    // Enviar log de configuração de vendas
-    const logEmbed = new EmbedBuilder()
-      .setTitle('⚙️ PAINEL DE VENDA CONFIGURADO ⚙️')
-      .setColor(3066993)
-      .setDescription(`O administrador <@${interaction.user.id}> configurou o painel de vendas no fórum ${canalForum}.`)
-      .addFields({
-        name: '💼 Cargos Autorizados:',
-        value: cargosPermitidosIds.map(id => `<@&${id}>`).join(', ')
-      })
-      .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
-      .setTimestamp();
-
-    await sendLog(interaction.client, interaction.guild, 'registrovenda', logEmbed);
-
+    return true;
   } catch (error) {
-    console.error('Erro ao executar o comando /registrovenda:', error);
-    await interaction.reply({
-      content: '❌ Ocorreu um erro ao configurar o painel de vendas no fórum.',
-      ephemeral: true
-    });
+    console.error('Erro ao criar painel de venda:', error);
+    return false;
   }
 }
-
-// Trata as interações iniciadas por venda_
+// Trata as intera├º├Áes iniciadas por venda_
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
   const dataAtual = new Date().toLocaleDateString('pt-BR');
 
-  // 1. Botão Nova Venda clicado
+  // 1. Bot├úo Nova Venda clicado
   if (customId === 'venda_nova_btn') {
     try {
       const forumId = interaction.channel.parentId;
       if (!forumId) {
         return await interaction.reply({
-          content: '❌ Erro: Este painel não foi localizado dentro de um canal de fórum.',
+          content: 'ÔØî Erro: Este painel n├úo foi localizado dentro de um canal de f├│rum.',
           ephemeral: true
         });
       }
@@ -148,18 +105,18 @@ export async function handleInteraction(interaction) {
       const config = getVendaPanel(forumId);
       if (!config) {
         return await interaction.reply({
-          content: '❌ Erro: Configuração de vendas deste fórum não localizada no banco de dados.',
+          content: 'ÔØî Erro: Configura├º├úo de vendas deste f├│rum n├úo localizada no banco de dados.',
           ephemeral: true
         });
       }
 
-      // Verificar permissão de cargos
+      // Verificar permiss├úo de cargos
       const hasPermission = config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId))
         || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
       if (!hasPermission) {
         return await interaction.reply({
-          content: '❌ Você não tem o cargo autorizado para registrar vendas!',
+          content: 'ÔØî Voc├¬ n├úo tem o cargo autorizado para registrar vendas!',
           ephemeral: true
         });
       }
@@ -167,7 +124,7 @@ export async function handleInteraction(interaction) {
       // Abrir modal de venda (5 campos)
       const modal = new ModalBuilder()
         .setCustomId('venda_nova_modal')
-        .setTitle('🛍️ Registrar Nova Venda');
+        .setTitle('­ƒøì´©Å Registrar Nova Venda');
 
       const clienteInput = new TextInputBuilder()
         .setCustomId('cliente_input')
@@ -203,10 +160,10 @@ export async function handleInteraction(interaction) {
 
       const parceriaInput = new TextInputBuilder()
         .setCustomId('parceria_input')
-        .setLabel('PARCERIA (SIM/NÃO)')
+        .setLabel('PARCERIA (SIM/N├âO)')
         .setStyle(TextInputStyle.Short)
-        .setValue('Não')
-        .setPlaceholder('Digite Sim ou Não')
+        .setValue('N├úo')
+        .setPlaceholder('Digite Sim ou N├úo')
         .setRequired(true);
 
       modal.addComponents(
@@ -222,7 +179,7 @@ export async function handleInteraction(interaction) {
     } catch (error) {
       console.error('Erro ao abrir modal de vendas:', error);
       await interaction.reply({
-        content: '❌ Ocorreu um erro ao abrir o formulário de venda.',
+        content: 'ÔØî Ocorreu um erro ao abrir o formul├írio de venda.',
         ephemeral: true
       });
     }
@@ -235,7 +192,7 @@ export async function handleInteraction(interaction) {
       const forumId = interaction.channel.parentId;
       if (!forumId) {
         return await interaction.reply({
-          content: '❌ Erro: Não foi possível obter o canal do fórum.',
+          content: 'ÔØî Erro: N├úo foi poss├¡vel obter o canal do f├│rum.',
           ephemeral: true
         });
       }
@@ -243,7 +200,7 @@ export async function handleInteraction(interaction) {
       const forumChannel = guild.channels.cache.get(forumId) || await guild.channels.fetch(forumId).catch(() => null);
       if (!forumChannel) {
         return await interaction.reply({
-          content: '❌ Erro: Canal de Fórum não localizado.',
+          content: 'ÔØî Erro: Canal de F├│rum n├úo localizado.',
           ephemeral: true
         });
       }
@@ -255,82 +212,82 @@ export async function handleInteraction(interaction) {
       const parceria = interaction.fields.getTextInputValue('parceria_input').trim();
 
       const saleEmbed = new EmbedBuilder()
-        .setTitle('🛍️ NOVA VENDA REGISTRADA 🛍️')
+        .setTitle('­ƒøì´©Å NOVA VENDA REGISTRADA ­ƒøì´©Å')
         .setDescription('Mais uma venda realizada com sucesso!')
         .addFields(
-          { name: '👤 Cliente:', value: cliente, inline: true },
-          { name: '🔢 Quantidade:', value: qtd, inline: true },
-          { name: '💰 Valor:', value: valor, inline: true },
-          { name: '📅 Data da Venda:', value: dataVenda, inline: true },
-          { name: '🤝 Parceria:', value: parceria, inline: true },
-          { name: '💼 Vendedor:', value: `<@${interaction.user.id}>`, inline: true }
+          { name: '­ƒæñ Cliente:', value: cliente, inline: true },
+          { name: '­ƒöó Quantidade:', value: qtd, inline: true },
+          { name: '­ƒÆ░ Valor:', value: valor, inline: true },
+          { name: '­ƒôà Data da Venda:', value: dataVenda, inline: true },
+          { name: '­ƒñØ Parceria:', value: parceria, inline: true },
+          { name: '­ƒÆ╝ Vendedor:', value: `<@${interaction.user.id}>`, inline: true }
         )
         .setColor(2326507)
-        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Vendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
         .setTimestamp();
 
       const btnConfirmar = new ButtonBuilder()
         .setCustomId(`venda_confirmar_btn_${interaction.user.id}`)
         .setLabel('Confirmar Venda')
         .setStyle(ButtonStyle.Success)
-        .setEmoji('✔️');
+        .setEmoji('Ô£ö´©Å');
 
       const btnExcluir = new ButtonBuilder()
         .setCustomId('venda_excluir_btn')
         .setLabel('Excluir Venda')
         .setStyle(ButtonStyle.Danger)
-        .setEmoji('🗑️');
+        .setEmoji('­ƒùæ´©Å');
 
       const rowButtons = new ActionRowBuilder().addComponents(btnConfirmar, btnExcluir);
 
-      // Criar novo tópico no fórum correspondente
+      // Criar novo t├│pico no f├│rum correspondente
       const newThread = await forumChannel.threads.create({
-        name: `🛍️┃Venda - ${cliente} - ${dataVenda}`,
+        name: `­ƒøì´©ÅÔöâVenda - ${cliente} - ${dataVenda}`,
         message: {
           embeds: [saleEmbed],
           components: [rowButtons]
         }
       });
 
-      // Salvar venda no banco para estatísticas do /perfil
+      // Salvar venda no banco para estat├¡sticas do /perfil
       addVenda(interaction.user.id, interaction.user.tag, {
         data: dataVenda,
         threadUrl: newThread.url
       });
 
       await interaction.reply({
-        content: `✅ Venda registrada com sucesso! Novo tópico criado: ${newThread}`,
+        content: `Ô£à Venda registrada com sucesso! Novo t├│pico criado: ${newThread}`,
         ephemeral: true
       });
 
       // Enviar log de nova venda
       const logEmbed = new EmbedBuilder()
-        .setTitle('🛍️ VENDA REGISTRADA 🛍️')
+        .setTitle('­ƒøì´©Å VENDA REGISTRADA ­ƒøì´©Å')
         .setColor(3066993)
-        .setDescription(`O membro <@${interaction.user.id}> registrou uma nova venda no fórum ${forumChannel}.`)
+        .setDescription(`O membro <@${interaction.user.id}> registrou uma nova venda no f├│rum ${forumChannel}.`)
         .addFields(
-          { name: '👤 Cliente:', value: cliente, inline: true },
-          { name: '🔢 Quantidade:', value: qtd, inline: true },
-          { name: '💰 Valor:', value: valor, inline: true },
-          { name: '📅 Data:', value: dataVenda, inline: true },
-          { name: '🤝 Parceria:', value: parceria, inline: true }
+          { name: '­ƒæñ Cliente:', value: cliente, inline: true },
+          { name: '­ƒöó Quantidade:', value: qtd, inline: true },
+          { name: '­ƒÆ░ Valor:', value: valor, inline: true },
+          { name: '­ƒôà Data:', value: dataVenda, inline: true },
+          { name: '­ƒñØ Parceria:', value: parceria, inline: true }
         )
-        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Vendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
 
     } catch (error) {
-      console.error('Erro ao processar submissão de modal de vendas:', error);
+      console.error('Erro ao processar submiss├úo de modal de vendas:', error);
       await interaction.reply({
-        content: '❌ Ocorreu um erro ao processar o registro da sua venda.',
+        content: 'ÔØî Ocorreu um erro ao processar o registro da sua venda.',
         ephemeral: true
       });
     }
     return;
   }
 
-  // 3. Botão Confirmar Venda clicado
+  // 3. Bot├úo Confirmar Venda clicado
   if (customId.startsWith('venda_confirmar_btn_')) {
     try {
       const vendedorId = customId.replace('venda_confirmar_btn_', '');
@@ -343,32 +300,32 @@ export async function handleInteraction(interaction) {
 
       if (!hasPermission) {
         return await interaction.reply({
-          content: '❌ Você não tem permissão para confirmar esta venda!',
+          content: 'ÔØî Voc├¬ n├úo tem permiss├úo para confirmar esta venda!',
           ephemeral: true
         });
       }
 
-      // Reagir com 💸
-      await interaction.message.react('💸').catch(() => null);
+      // Reagir com ­ƒÆ©
+      await interaction.message.react('­ƒÆ©').catch(() => null);
 
       // Editar embed
       const originalEmbed = interaction.message.embeds[0];
       let updatedEmbed = EmbedBuilder.from(originalEmbed)
-        .setTitle('✅ VENDA CONFIRMADA ✅')
+        .setTitle('Ô£à VENDA CONFIRMADA Ô£à')
         .setColor(3066993)
-        .addFields({ name: '✔️ Confirmado por:', value: `<@${interaction.user.id}>`, inline: true });
+        .addFields({ name: 'Ô£ö´©Å Confirmado por:', value: `<@${interaction.user.id}>`, inline: true });
 
       const btnDesconfirmar = new ButtonBuilder()
         .setCustomId(`venda_desconfirmar_btn_${vendedorId}`)
         .setLabel('Desconfirmar Venda')
         .setStyle(ButtonStyle.Secondary)
-        .setEmoji('↩️');
+        .setEmoji('Ôå®´©Å');
 
       const btnExcluir = new ButtonBuilder()
         .setCustomId('venda_excluir_btn')
         .setLabel('Excluir Venda')
         .setStyle(ButtonStyle.Danger)
-        .setEmoji('🗑️');
+        .setEmoji('­ƒùæ´©Å');
 
       const rowButtons = new ActionRowBuilder().addComponents(btnDesconfirmar, btnExcluir);
 
@@ -377,24 +334,24 @@ export async function handleInteraction(interaction) {
         components: [rowButtons]
       });
 
-      // Log de confirmação
+      // Log de confirma├º├úo
       const logEmbed = new EmbedBuilder()
-        .setTitle('✅ VENDA CONFIRMADA ✅')
+        .setTitle('Ô£à VENDA CONFIRMADA Ô£à')
         .setColor(3066993)
-        .setDescription(`O administrador <@${interaction.user.id}> confirmou a venda realizada por <@${vendedorId}> no fórum <#${forumId}>.`)
-        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
+        .setDescription(`O administrador <@${interaction.user.id}> confirmou a venda realizada por <@${vendedorId}> no f├│rum <#${forumId}>.`)
+        .setFooter({ text: `LuxBot Vendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
 
     } catch (error) {
       console.error('Erro ao confirmar venda:', error);
-      await interaction.reply({ content: '❌ Erro ao confirmar venda.', ephemeral: true }).catch(() => null);
+      await interaction.reply({ content: 'ÔØî Erro ao confirmar venda.', ephemeral: true }).catch(() => null);
     }
     return;
   }
 
-  // 4. Botão Excluir Venda clicado
+  // 4. Bot├úo Excluir Venda clicado
   if (customId === 'venda_excluir_btn') {
     try {
       const forumId = interaction.channel.parentId;
@@ -406,7 +363,7 @@ export async function handleInteraction(interaction) {
 
       if (!hasPermission) {
         return await interaction.reply({
-          content: '❌ Você não tem permissão para excluir esta venda!',
+          content: 'ÔØî Voc├¬ n├úo tem permiss├úo para excluir esta venda!',
           ephemeral: true
         });
       }
@@ -415,26 +372,26 @@ export async function handleInteraction(interaction) {
 
       // Enviar log antes de deletar o canal
       const logEmbed = new EmbedBuilder()
-        .setTitle('🗑️ VENDA EXCLUÍDA 🗑️')
+        .setTitle('­ƒùæ´©Å VENDA EXCLU├ìDA ­ƒùæ´©Å')
         .setColor(15158332)
-        .setDescription(`O administrador <@${interaction.user.id}> excluiu o tópico de venda **${thread.name}** no fórum <#${forumId}>.`)
-        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
+        .setDescription(`O administrador <@${interaction.user.id}> excluiu o t├│pico de venda **${thread.name}** no f├│rum <#${forumId}>.`)
+        .setFooter({ text: `LuxBot Vendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
 
       // Deletar o canal/thread correspondente
-      await interaction.reply({ content: 'Excluindo tópico de venda...', ephemeral: true });
+      await interaction.reply({ content: 'Excluindo t├│pico de venda...', ephemeral: true });
       await thread.delete().catch(() => null);
 
     } catch (error) {
       console.error('Erro ao excluir venda:', error);
-      await interaction.reply({ content: '❌ Erro ao excluir venda.', ephemeral: true }).catch(() => null);
+      await interaction.reply({ content: 'ÔØî Erro ao excluir venda.', ephemeral: true }).catch(() => null);
     }
     return;
   }
 
-  // 5. Botão Desconfirmar Venda clicado
+  // 5. Bot├úo Desconfirmar Venda clicado
   if (customId.startsWith('venda_desconfirmar_btn_')) {
     try {
       const vendedorId = customId.replace('venda_desconfirmar_btn_', '');
@@ -447,13 +404,13 @@ export async function handleInteraction(interaction) {
 
       if (!hasPermission) {
         return await interaction.reply({
-          content: '❌ Você não tem permissão para desconfirmar esta venda!',
+          content: 'ÔØî Voc├¬ n├úo tem permiss├úo para desconfirmar esta venda!',
           ephemeral: true
         });
       }
 
-      // Remover reação 💸
-      const reaction = interaction.message.reactions.cache.find(r => r.emoji.name === '💸');
+      // Remover rea├º├úo ­ƒÆ©
+      const reaction = interaction.message.reactions.cache.find(r => r.emoji.name === '­ƒÆ©');
       if (reaction) {
         await reaction.users.remove(interaction.client.user.id).catch(() => null);
       }
@@ -465,7 +422,7 @@ export async function handleInteraction(interaction) {
       const cleanFields = originalEmbed.fields.filter(f => !f.name.includes('Confirmado por'));
 
       const revertedEmbed = new EmbedBuilder()
-        .setTitle('🛍️ NOVA VENDA REGISTRADA 🛍️')
+        .setTitle('­ƒøì´©Å NOVA VENDA REGISTRADA ­ƒøì´©Å')
         .setDescription(originalEmbed.description || 'Mais uma venda realizada com sucesso!')
         .addFields(cleanFields)
         .setColor(2326507) // Cor verde original
@@ -476,13 +433,13 @@ export async function handleInteraction(interaction) {
         .setCustomId(`venda_confirmar_btn_${vendedorId}`)
         .setLabel('Confirmar Venda')
         .setStyle(ButtonStyle.Success)
-        .setEmoji('✔️');
+        .setEmoji('Ô£ö´©Å');
 
       const btnExcluir = new ButtonBuilder()
         .setCustomId('venda_excluir_btn')
         .setLabel('Excluir Venda')
         .setStyle(ButtonStyle.Danger)
-        .setEmoji('🗑️');
+        .setEmoji('­ƒùæ´©Å');
 
       const rowButtons = new ActionRowBuilder().addComponents(btnConfirmar, btnExcluir);
 
@@ -491,19 +448,19 @@ export async function handleInteraction(interaction) {
         components: [rowButtons]
       });
 
-      // Log de desconfirmação
+      // Log de desconfirma├º├úo
       const logEmbed = new EmbedBuilder()
-        .setTitle('↩️ VENDA DESCONFIRMADA ↩️')
+        .setTitle('Ôå®´©Å VENDA DESCONFIRMADA Ôå®´©Å')
         .setColor(3447003)
-        .setDescription(`O administrador <@${interaction.user.id}> desconfirmou a venda de <@${vendedorId}> no fórum <#${forumId}>.`)
-        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
+        .setDescription(`O administrador <@${interaction.user.id}> desconfirmou a venda de <@${vendedorId}> no f├│rum <#${forumId}>.`)
+        .setFooter({ text: `LuxBot Vendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
 
     } catch (error) {
       console.error('Erro ao desconfirmar venda:', error);
-      await interaction.reply({ content: '❌ Erro ao desconfirmar venda.', ephemeral: true }).catch(() => null);
+      await interaction.reply({ content: 'ÔØî Erro ao desconfirmar venda.', ephemeral: true }).catch(() => null);
     }
   }
 }

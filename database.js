@@ -33,7 +33,7 @@ export function initDatabase() {
 }
 
 // Retorna o objeto JSON completo do banco de dados
-function getDatabase() {
+export function getDatabase() {
   initDatabase();
   try {
     const data = fs.readFileSync(DB_PATH, 'utf-8');
@@ -45,7 +45,7 @@ function getDatabase() {
 }
 
 // Salva o objeto JSON completo no banco de dados
-function saveDatabase(data) {
+export function saveDatabase(data) {
   try {
     fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
     return true;
@@ -647,6 +647,75 @@ export function getWarningByMessageId(messageId) {
   }
   return null;
 }
+
+// ==========================================
+// MÓDULO: CONFIGURAÇÕES GLOBAIS
+// ==========================================
+
+export function getGlobalVendaConfig() {
+  const db = getDatabase();
+  return db.vendaPaineis?.[0] || null;
+}
+
+export function saveGlobalVendaConfig(config) {
+  const db = getDatabase();
+  db.vendaPaineis = [config];
+  return saveDatabase(db);
+}
+
+export function getGlobalEncomendaConfig() {
+  const db = getDatabase();
+  return db.encomendaPaineis?.[0] || null;
+}
+
+export function saveGlobalEncomendaConfig(config) {
+  const db = getDatabase();
+  db.encomendaPaineis = [config];
+  return saveDatabase(db);
+}
+
+export function getGlobalAusenciaConfig() {
+  const db = getDatabase();
+  return db.ausenciaPaineis?.[0] || null;
+}
+
+export function saveGlobalAusenciaConfig(config) {
+  const db = getDatabase();
+  db.ausenciaPaineis = [config];
+  return saveDatabase(db);
+}
+
+export function getGlobalFarmConfig() {
+  const db = getDatabase();
+  return db.farmPaineis?.[0] || null;
+}
+
+export function saveGlobalFarmConfig(config) {
+  const db = getDatabase();
+  db.farmPaineis = [config];
+  return saveDatabase(db);
+}
+
+export function getGlobalRecrutamentoConfig() {
+  const db = getDatabase();
+  return db.paineis?.[0] || null;
+}
+
+export function saveGlobalRecrutamentoConfig(config) {
+  const db = getDatabase();
+  db.paineis = [config];
+  return saveDatabase(db);
+}
+
+// Exclui a ficha do membro do banco de dados
+export function deleteRecruta(userId) {
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  const filtered = recrutas.filter(r => r.discordId !== userId);
+  return saveDatabase({ ...db, recrutas: filtered });
+}
+
+
 
 
 

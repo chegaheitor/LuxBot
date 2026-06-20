@@ -1,66 +1,59 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, RoleSelectMenuBuilder, ChannelType, PermissionFlagsBits } from 'discord.js';
-import { savePendingRecruta, updateRecrutaStatus, savePanelConfig, getPanelConfig } from '../database.js';
+import { 
+  SlashCommandBuilder, 
+  EmbedBuilder, 
+  ActionRowBuilder, 
+  ButtonBuilder, 
+  ButtonStyle, 
+  ModalBuilder, 
+  TextInputBuilder, 
+  TextInputStyle, 
+  RoleSelectMenuBuilder, 
+  ChannelType, 
+  PermissionFlagsBits 
+} from 'discord.js';
+import { savePendingRecruta, updateRecrutaStatus, getGlobalRecrutamentoConfig } from '../database.js';
 import { sendLog } from '../logs.js';
 
 export const data = new SlashCommandBuilder()
-  .setName('registroembed')
-  .setDescription('Envia o painel de recrutamento para o canal selecionado.')
-  .addChannelOption(option =>
-    option.setName('canal_painel')
-      .setDescription('O canal onde a mensagem com o botão de recrutamento será enviada')
-      .setRequired(true)
-      .addChannelTypes(ChannelType.GuildText)
-  )
-  .addChannelOption(option =>
-    option.setName('canal_pedidos')
-      .setDescription('O canal para onde as respostas do formulário serão enviadas')
-      .setRequired(true)
-      .addChannelTypes(ChannelType.GuildText)
-  )
-  .addChannelOption(option =>
-    option.setName('canal_logs_negado')
-      .setDescription('O canal para onde as notificações de recusa serão enviadas')
-      .setRequired(true)
-      .addChannelTypes(ChannelType.GuildText)
-  )
-  .addRoleOption(option =>
-    option.setName('cargo_admin_1')
-      .setDescription('Cargo autorizado a gerenciar o recrutamento')
-      .setRequired(true)
-  )
-  .addRoleOption(option =>
-    option.setName('cargo_admin_2')
-      .setDescription('Segundo cargo autorizado a gerenciar o recrutamento (opcional)')
-      .setRequired(false)
-  )
-  .addRoleOption(option =>
-    option.setName('cargo_admin_3')
-      .setDescription('Terceiro cargo autorizado a gerenciar o recrutamento (opcional)')
-      .setRequired(false)
-  )
+  .setName('criarrecrutamento')
+  .setDescription('Cria o painel de recrutamento no canal configurado no /painelconfig.')
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 export async function execute(interaction) {
   try {
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
-    const canalPainel = interaction.options.getChannel('canal_painel');
-    const canalPedidos = interaction.options.getChannel('canal_pedidos');
-    const canalLogsNegado = interaction.options.getChannel('canal_logs_negado');
-
-    const adminRole1 = interaction.options.getRole('cargo_admin_1');
-    const adminRole2 = interaction.options.getRole('cargo_admin_2');
-    const adminRole3 = interaction.options.getRole('cargo_admin_3');
-
-    const cargosAdminIds = [adminRole1.id];
-    if (adminRole2) cargosAdminIds.push(adminRole2.id);
-    if (adminRole3) cargosAdminIds.push(adminRole3.id);
-
-    // Salvar as configurações do painel no banco de dados local
-    savePanelConfig({
-      canalPedidosId: canalPedidos.id,
-      canalLogsNegadoId: canalLogsNegado.id,
-      cargosAdminIds: cargosAdminIds
+    const success = await criarPainelRecrutamento(interaction.client, interaction.guild);
+    if (success) {
+      await interaction.reply({ 
+        content: `✅ Painel de recrutamento enviado com sucesso no canal configurado!`, 
+        ephemeral: true 
+      });
+    } else {
+      await interaction.reply({ 
+        content: '❌ Configurações de Recrutamento incompletas! Configure no `/painelconfig` primeiro.', 
+        ephemeral: true 
+      });
+    }
+  } catch (error) {
+    console.error('Erro ao executar o comando /criarrecrutamento:', error);
+    await interaction.reply({ 
+      content: '❌ Ocorreu um erro ao criar o painel de recrutamento.', 
+      ephemeral: true 
     });
+  }
+}
+
+export async function criarPainelRecrutamento(client, guild) {
+  try {
+    const config = getGlobalRecrutamentoConfig();
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
+
+    if (!config || !config.canalPainelId || !config.canalPedidosId || !config.canalLogsNegadoId) {
+      return false;
+    }
+
+    const canalPainel = guild.channels.cache.get(config.canalPainelId)
+      || await guild.channels.fetch(config.canalPainelId).catch(() => null);
+    if (!canalPainel || canalPainel.type !== ChannelType.GuildText) return false;
 
     // Criação do embed inicial do painel de recrutamento
     const embed = new EmbedBuilder()
@@ -75,11 +68,12 @@ export async function execute(interaction) {
         'Seja muito bem vindo a Lux!'
       )
       .setColor(2326507)
-      .setFooter({ text: `LuxBot Recrutamento • ${dataAtual} • criado por chegaheitor` });
+      .setFooter({ text: `LuxBot Recrutamento • ${dataAtual} • criado por chegaheitor` })
+      .setTimestamp();
 
     // Guardamos os IDs do canal de pedidos e logs_negado no customId do botão
     const button = new ButtonBuilder()
-      .setCustomId(`embed_pedir_set_btn_${canalPedidos.id}_${canalLogsNegado.id}`)
+      .setCustomId(`embed_pedir_set_btn_${config.canalPedidosId}_${config.canalLogsNegadoId}`)
       .setLabel('Pedir set')
       .setStyle(ButtonStyle.Primary)
       .setEmoji('✅');
@@ -88,18 +82,10 @@ export async function execute(interaction) {
 
     // Envia o painel de recrutamento no canal especificado
     await canalPainel.send({ embeds: [embed], components: [row] });
-
-    // Responde de forma privada para o administrador que executou o comando
-    await interaction.reply({ 
-      content: `Painel de recrutamento enviado no canal ${canalPainel}! As respostas serão enviadas em ${canalPedidos}.`, 
-      ephemeral: true 
-    });
+    return true;
   } catch (error) {
-    console.error('Erro ao executar o comando /registroembed:', error);
-    await interaction.reply({ 
-      content: 'Ocorreu um erro ao enviar o painel de recrutamento. Verifique se o bot tem permissão de escrita no canal selecionado.', 
-      ephemeral: true 
-    });
+    console.error('Erro ao criar painel de recrutamento:', error);
+    return false;
   }
 }
 
@@ -182,10 +168,10 @@ export async function handleInteraction(interaction) {
         const canalLogsNegadoId = parts[1];
 
         // Verificar permissões
-        const config = getPanelConfig(interaction.channelId);
-        const hasPermission = config && config.cargosAdminIds 
-          ? config.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
-          : interaction.member.permissions.has('Administrator');
+        const config = getGlobalRecrutamentoConfig();
+        const hasPermission = config && config.cargosStaffIds 
+          ? config.cargosStaffIds.some(roleId => interaction.member.roles.cache.has(roleId))
+          : interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
         if (!hasPermission) {
           return await interaction.reply({ content: '❌ Você não tem permissão para gerenciar este recrutamento!', ephemeral: true });
@@ -220,10 +206,10 @@ export async function handleInteraction(interaction) {
         const cargoId = interaction.values[0];
 
         // Verificar permissões
-        const config = getPanelConfig(interaction.channelId);
-        const hasPermission = config && config.cargosAdminIds 
-          ? config.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
-          : interaction.member.permissions.has('Administrator');
+        const config = getGlobalRecrutamentoConfig();
+        const hasPermission = config && config.cargosStaffIds 
+          ? config.cargosStaffIds.some(roleId => interaction.member.roles.cache.has(roleId))
+          : interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
         if (!hasPermission) {
           return await interaction.reply({ content: '❌ Você não tem permissão para gerenciar este recrutamento!', ephemeral: true });
@@ -376,7 +362,8 @@ export async function handleInteraction(interaction) {
             `💼 CARGO\n${cargoDesejado}\n\n`
           )
           .setColor(2326507)
-          .setFooter({ text: `LuxBot Recrutamento • ${dataAtual} • criado por chegaheitor` });
+          .setFooter({ text: `LuxBot Recrutamento • ${dataAtual} • criado por chegaheitor` })
+          .setTimestamp();
 
         // Criar select de cargo e botão negar
         const roleSelect = new RoleSelectMenuBuilder()
