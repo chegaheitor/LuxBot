@@ -44,12 +44,12 @@ export async function criarPainelFarm(client, guild) {
   try {
     const config = getGlobalFarmConfig();
     const dataAtual = new Date().toLocaleDateString('pt-BR');
-    
+
     if (!config || !config.painelCanalId || !config.categoriaId) {
       return false;
     }
 
-    const canalPainel = guild.channels.cache.get(config.painelCanalId) 
+    const canalPainel = guild.channels.cache.get(config.painelCanalId)
       || await guild.channels.fetch(config.painelCanalId).catch(() => null);
     if (!canalPainel) return false;
 
@@ -77,7 +77,7 @@ export async function criarPainelFarm(client, guild) {
 }
 // Método para tratar interações relativas a este comando
 export async function handleInteraction(interaction) {
-  const { customId } = interaction;
+  const { customId, guild } = interaction;
   const dataAtual = new Date().toLocaleDateString('pt-BR');
 
   // 1. Tratar botões
@@ -132,7 +132,6 @@ export async function handleInteraction(interaction) {
         }
 
         // C. Verificar se a categoria configurada realmente existe no servidor
-        const guild = interaction.guild;
         const category = guild.channels.cache.get(config.categoriaId)
           || await guild.channels.fetch(config.categoriaId).catch(() => null);
 
@@ -226,7 +225,7 @@ export async function handleInteraction(interaction) {
 
         const btnDelete = new ButtonBuilder()
           .setCustomId('farm_apagar_pasta_btn')
-          .setLabel('Apagar pasta de meta')
+          .setLabel('Apagar pasta')
           .setStyle(ButtonStyle.Danger)
           .setEmoji('🗑️');
 
@@ -790,14 +789,14 @@ export async function handleInteraction(interaction) {
         // Envia mensagem de confirmação apenas para quem clicou (ephemeral)
         const confirmBtn = new ButtonBuilder()
           .setCustomId('farm_confirmar_apagar_btn')
-          .setLabel('Confirmar Exclus├úo da Pasta')
+          .setLabel('Confirmar Exclusão da Pasta')
           .setStyle(ButtonStyle.Danger)
           .setEmoji('🗑️');
 
         const row = new ActionRowBuilder().addComponents(confirmBtn);
 
         await interaction.reply({
-          content: '⚠️ **ATEN├ç├âO:** Você tem certeza de que deseja apagar esta pasta de farm? Todos os registros do canal serão excluídos.',
+          content: '⚠️ **ATENÇÃO:** Você tem certeza de que deseja apagar esta pasta de farm? Todos os registros do canal serão excluídos.',
           components: [row],
           ephemeral: true
         });
@@ -845,7 +844,7 @@ export async function handleInteraction(interaction) {
     }
   }
 
-  // 2. Tratar menus de sele├º├úo
+  // 2. Tratar menus de seleção
   if (interaction.isStringSelectMenu()) {
     if (customId === 'farm_adicionar_select') {
       try {
@@ -936,7 +935,7 @@ export async function handleInteraction(interaction) {
     }
   }
 
-  // 3. Tratar submiss├Áes de modais
+  // 3. Tratar submissão de modais
   if (interaction.isModalSubmit()) {
 
     // Modal de Adicionar Farm

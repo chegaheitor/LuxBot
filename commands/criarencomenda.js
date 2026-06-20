@@ -321,7 +321,13 @@ export async function handleInteraction(interaction) {
       }
 
       const originalEmbed = interaction.message.embeds[0];
-      const fields = originalEmbed.fields;
+      if (!originalEmbed) {
+        return await interaction.reply({
+          content: '❌ Erro: Não foi possível obter os dados da encomenda. O embed não foi encontrado.',
+          ephemeral: true
+        });
+      }
+      const fields = originalEmbed.fields || [];
 
       const getFieldValue = (namePart) => {
         const f = fields.find(field => field.name.toLowerCase().includes(namePart.toLowerCase()));
@@ -420,8 +426,14 @@ export async function handleInteraction(interaction) {
       }
 
       const originalEmbed = interaction.message.embeds[0];
-      const statusField = originalEmbed.fields.find(f => f.name.toLowerCase().includes('status'));
-      const isProducing = originalEmbed.title.toLowerCase().includes('produção')
+      if (!originalEmbed) {
+        return await interaction.reply({
+          content: '❌ Erro: Não foi possível obter os dados da encomenda. O embed não foi encontrado.',
+          ephemeral: true
+        });
+      }
+      const statusField = originalEmbed.fields ? originalEmbed.fields.find(f => f.name.toLowerCase().includes('status')) : null;
+      const isProducing = (originalEmbed.title && originalEmbed.title.toLowerCase().includes('produção'))
         || (statusField && statusField.value.toLowerCase().includes('produção'));
 
       if (!isProducing) {
@@ -431,7 +443,7 @@ export async function handleInteraction(interaction) {
         });
       }
 
-      const fields = originalEmbed.fields;
+      const fields = originalEmbed.fields || [];
       const getFieldValue = (namePart) => {
         const f = fields.find(field => field.name.toLowerCase().includes(namePart.toLowerCase()));
         return f ? f.value : 'Desconhecido';
@@ -471,12 +483,18 @@ export async function handleInteraction(interaction) {
         .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
-      // Botões do Estado Entregue: Voltar a Pendente e Excluir Encomenda
+      // Botões do Estado Entregue: Voltar a Pendente, Voltar para Produção e Excluir Encomenda
       const btnVoltar = new ButtonBuilder()
         .setCustomId(`encomenda_pendente_btn_${donoId}`)
         .setLabel('Voltar a Pendente')
         .setStyle(ButtonStyle.Secondary)
         .setEmoji('⏳');
+
+      const btnVoltarProd = new ButtonBuilder()
+        .setCustomId(`encomenda_voltar_producao_btn_${donoId}`)
+        .setLabel('Voltar para Produção')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('🏭');
 
       const btnExcluir = new ButtonBuilder()
         .setCustomId('encomenda_excluir_btn')
@@ -484,7 +502,7 @@ export async function handleInteraction(interaction) {
         .setStyle(ButtonStyle.Danger)
         .setEmoji('🗑️');
 
-      const rowButtons = new ActionRowBuilder().addComponents(btnVoltar, btnExcluir);
+      const rowButtons = new ActionRowBuilder().addComponents(btnVoltar, btnVoltarProd, btnExcluir);
 
       await interaction.update({
         embeds: [updatedEmbed],
@@ -525,7 +543,13 @@ export async function handleInteraction(interaction) {
       }
 
       const originalEmbed = interaction.message.embeds[0];
-      const fields = originalEmbed.fields;
+      if (!originalEmbed) {
+        return await interaction.reply({
+          content: '❌ Erro: Não foi possível obter os dados da encomenda. O embed não foi encontrado.',
+          ephemeral: true
+        });
+      }
+      const fields = originalEmbed.fields || [];
 
       const getFieldValue = (namePart) => {
         const f = fields.find(field => field.name.toLowerCase().includes(namePart.toLowerCase()));
@@ -594,6 +618,111 @@ export async function handleInteraction(interaction) {
 
     } catch (error) {
       console.error('Erro ao reverter encomenda para pendente:', error);
+      await interaction.reply({ content: '❌ Erro ao reverter status da encomenda.', ephemeral: true }).catch(() => null);
+    }
+    return;
+  }
+
+  // 5b. Botão Voltar para Produção clicado (Reverte para Em Produção)
+  if (customId.startsWith('encomenda_voltar_producao_btn_')) {
+    try {
+      const donoId = customId.replace('encomenda_voltar_producao_btn_', '');
+      const forumId = interaction.channel.parentId;
+
+      const config = getGlobalEncomendaConfig();
+      const hasPermission = hasEncomendaStaffPermission(interaction, config);
+
+      if (!hasPermission) {
+        return await interaction.reply({
+          content: '❌ Você não tem permissão para redefinir o status desta encomenda!',
+          ephemeral: true
+        });
+      }
+
+      const originalEmbed = interaction.message.embeds[0];
+      if (!originalEmbed) {
+        return await interaction.reply({
+          content: '❌ Erro: Não foi possível obter os dados da encomenda. O embed não foi encontrado.',
+          ephemeral: true
+        });
+      }
+      const fields = originalEmbed.fields || [];
+
+      const getFieldValue = (namePart) => {
+        const f = fields.find(field => field.name.toLowerCase().includes(namePart.toLowerCase()));
+        return f ? f.value : 'Desconhecido';
+      };
+
+      const cliente = getFieldValue('Cliente');
+      const qtd = getFieldValue('Quantidade');
+      const valor = getFieldValue('Valor');
+      const dataEntrega = getFieldValue('Entrega');
+      const parceria = getFieldValue('Parceria');
+      const vendedorMencao = getFieldValue('Registrado');
+
+      // Limpar reações antigas e reagir com 🏭
+      await interaction.message.reactions.removeAll().catch(() => null);
+      await interaction.message.react('🏭').catch(() => null);
+
+      // Atualizar nome do tópico/canal
+      await interaction.channel.setName(`🏭 Produção - ${cliente} - ${dataEntrega}`).catch(() => null);
+
+      // Embed em produção
+      const updatedEmbed = new EmbedBuilder()
+        .setTitle('🏭 ENCOMENDA EM PRODUÇÃO 🏭')
+        .setDescription('A fabricação dos itens solicitados foi reiniciada.')
+        .addFields(
+          { name: '👤 Cliente:', value: cliente, inline: true },
+          { name: '🔢 Quantidade:', value: qtd, inline: true },
+          { name: '💰 Valor:', value: valor, inline: true },
+          { name: '📅 Entrega até:', value: dataEntrega, inline: true },
+          { name: '🤝 Parceria:', value: parceria, inline: true },
+          { name: '💼 Registrado por:', value: vendedorMencao, inline: true },
+          { name: '🏭 Produção por:', value: `<@${interaction.user.id}>`, inline: true },
+          { name: 'ℹ️ Status:', value: '🏭 Em Produção', inline: true }
+        )
+        .setColor(3447003) // Azul
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+        .setTimestamp();
+
+      // Botões do Estado Em Produção: Entregar Encomenda, Voltar a Pendente e Excluir Encomenda
+      const btnEntregar = new ButtonBuilder()
+        .setCustomId(`encomenda_entregar_btn_${donoId}`)
+        .setLabel('Entregar Encomenda')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('✅');
+
+      const btnVoltar = new ButtonBuilder()
+        .setCustomId(`encomenda_pendente_btn_${donoId}`)
+        .setLabel('Voltar a Pendente')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('⏳');
+
+      const btnExcluir = new ButtonBuilder()
+        .setCustomId('encomenda_excluir_btn')
+        .setLabel('Excluir Encomenda')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🗑️');
+
+      const rowButtons = new ActionRowBuilder().addComponents(btnEntregar, btnVoltar, btnExcluir);
+
+      await interaction.update({
+        embeds: [updatedEmbed],
+        components: [rowButtons]
+      });
+
+      // Enviar log
+      const logEmbed = new EmbedBuilder()
+        .setTitle('🏭 ENCOMENDA VOLTOU A PRODUÇÃO 🏭')
+        .setColor(3447003)
+        .setDescription(`O membro <@${interaction.user.id}> redefiniu o status da encomenda de ${cliente} para produção.`)
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+        .setTimestamp();
+
+      await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
+
+    } catch (error) {
+      console.error('Erro ao reverter encomenda para produção:', error);
       await interaction.reply({ content: '❌ Erro ao reverter status da encomenda.', ephemeral: true }).catch(() => null);
     }
     return;

@@ -98,7 +98,7 @@ client.on(Events.InteractionCreate, async interaction => {
   if (!customId) return;
 
   // Roteamento de interações baseado em prefixos
-  if (customId.startsWith('embed_')) {
+  if (customId.startsWith('embed_') || customId.startsWith('recrutamento_')) {
     const command = client.commands.get('criarrecrutamento');
     if (command && typeof command.handleInteraction === 'function') {
       try {
