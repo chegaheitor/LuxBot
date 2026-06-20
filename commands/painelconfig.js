@@ -519,7 +519,7 @@ export async function handleInteraction(interaction) {
         .setCustomId('painelconfig_tempselect_adv_staff')
         .setPlaceholder('Escolha os cargos autorizados a aplicar/remover Adv...')
         .setMinValues(1)
-        .setMaxValues(5);
+        .setMaxValues(25);
 
       const btnSave = new ButtonBuilder()
         .setCustomId(`painelconfig_save_adv_staff_${existingRoles.join('_')}`)
@@ -570,7 +570,7 @@ export async function handleInteraction(interaction) {
       .setCustomId(`painelconfig_tempselect_adv_cargo${level}`)
       .setPlaceholder(`Selecione os cargos para Adv ${level}...`)
       .setMinValues(1)
-      .setMaxValues(5);
+      .setMaxValues(25);
     
     const btnSave = new ButtonBuilder()
       .setCustomId(`painelconfig_save_adv_cargo${level}_${existingRoles.join('_')}`)
@@ -655,7 +655,7 @@ export async function handleInteraction(interaction) {
         .setCustomId('painelconfig_tempselect_farm')
         .setPlaceholder('Escolha os cargos autorizados a gerenciar metas e farms...')
         .setMinValues(1)
-        .setMaxValues(5);
+        .setMaxValues(25);
 
       const btnSave = new ButtonBuilder()
         .setCustomId(`painelconfig_save_farm_${existingRoles.join('_')}`)
@@ -878,7 +878,7 @@ export async function handleInteraction(interaction) {
       .setCustomId(`painelconfig_tempselect_bau_create_${name}_${channelId}`)
       .setPlaceholder('Selecione os cargos autorizados...')
       .setMinValues(1)
-      .setMaxValues(5);
+      .setMaxValues(25);
 
     const btnSave = new ButtonBuilder()
       .setCustomId(`painelconfig_save_bau_create_${name}_${channelId}_`)
@@ -895,7 +895,7 @@ export async function handleInteraction(interaction) {
     const row = new ActionRowBuilder().addComponents(selectRoles);
     const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
     return await interaction.update({
-      content: `Selecione até 5 cargos permitidos a adicionar/remover itens no baú **${name}** (<#${channelId}>):`,
+      content: `Selecione os cargos permitidos a adicionar/remover itens no baú **${name}** (<#${channelId}>):`,
       components: [row, rowBtns]
     });
   }
@@ -1047,7 +1047,7 @@ export async function handleInteraction(interaction) {
         .setCustomId(`painelconfig_tempselect_simple_${moduleName}`)
         .setPlaceholder(`Selecione os cargos para ${moduleName}...`)
         .setMinValues(1)
-        .setMaxValues(5);
+        .setMaxValues(25);
 
       const btnSave = new ButtonBuilder()
         .setCustomId(`painelconfig_save_simple_${moduleName}_${existingRoles.join('_')}`)
