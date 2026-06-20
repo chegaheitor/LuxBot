@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import { initDatabase } from './database.js';
+import { handleInteraction as handleListarbauInteraction } from './commands/listarbau.js';
 
 // Carregar variáveis de ambiente do arquivo .env
 dotenv.config();
@@ -153,13 +154,10 @@ client.on(Events.InteractionCreate, async interaction => {
       }
     }
   } else if (customId.startsWith('bau_') || customId.startsWith('listarbau_')) {
-    const command = client.commands.get('listarbau');
-    if (command && typeof command.handleInteraction === 'function') {
-      try {
-        await command.handleInteraction(interaction);
-      } catch (error) {
-        console.error('Erro ao processar interação do listarbau:', error);
-      }
+    try {
+      await handleListarbauInteraction(interaction);
+    } catch (error) {
+      console.error('Erro ao processar interação do listarbau:', error);
     }
   } else if (customId.startsWith('adv_')) {
     const command = client.commands.get('adv');

@@ -427,6 +427,42 @@ export async function handleInteraction(interaction) {
     }
   }
 
+  if (interaction.isButton() && customId.startsWith('painelconfig_confirm_excluir_bau_')) {
+    const messageId = customId.replace('painelconfig_confirm_excluir_bau_', '');
+    const chest = getBau(messageId);
+
+    if (!chest) {
+      return await interaction.reply({ content: '❌ Baú não encontrado ou já excluído!', ephemeral: true });
+    }
+
+    // 1. Apagar a mensagem do baú no canal
+    try {
+      const channel = await guild.channels.fetch(chest.canalId).catch(() => null);
+      if (channel) {
+        const msg = await channel.messages.fetch(messageId).catch(() => null);
+        if (msg) {
+          await msg.delete().catch(() => null);
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao deletar mensagem do baú no Discord:', e);
+    }
+
+    // 2. Deletar do banco de dados
+    deleteBau(messageId);
+
+    // 3. Log de Exclusão
+    const logEmbed = new EmbedBuilder()
+      .setTitle('🗑️ Baú Excluído')
+      .setColor(15548997)
+      .setDescription(`O administrador <@${interaction.user.id}> excluiu permanentemente o baú **${chest.nome}** que estava em <#${chest.canalId}>.`)
+      .setTimestamp();
+    await sendLog(interaction.client, guild, 'listarbau', logEmbed);
+
+    await showBauMenu(interaction);
+    return await interaction.followUp({ content: `✅ Baú **${chest.nome}** excluído com sucesso!`, ephemeral: true });
+  }
+
   // ========================================================
   // MÓDULO LOGS: CONFIGURAÇÕES E INTERAÇÕES
   // ========================================================
@@ -801,6 +837,29 @@ export async function handleInteraction(interaction) {
     });
   }
 
+  if (interaction.isStringSelectMenu() && customId === 'painelconfig_select_bau_para_editar') {
+    const messageId = interaction.values[0];
+    return await showEditBauMenu(interaction, messageId);
+  }
+
+  if (interaction.isStringSelectMenu() && customId.startsWith('painelconfig_select_bau_item_excl_remove_')) {
+    const messageId = customId.replace('painelconfig_select_bau_item_excl_remove_', '');
+    const target = interaction.values[0];
+    const chest = getBau(messageId);
+
+    if (!chest) {
+      return await interaction.reply({ content: '❌ Baú não encontrado!', ephemeral: true });
+    }
+
+    if (chest.itensExclusivos) {
+      chest.itensExclusivos = chest.itensExclusivos.filter(i => i !== target);
+      saveBau(chest);
+    }
+
+    await showEditBauMenu(interaction, messageId);
+    return await interaction.followUp({ content: `✅ Item exclusivo **${target}** removido com sucesso do baú **${chest.nome}**!`, ephemeral: true });
+  }
+
   if (interaction.isStringSelectMenu() && customId === 'painelconfig_select_farm_mat_remove') {
     const target = interaction.values[0];
     let materials = getFarmMaterials();
@@ -862,6 +921,242 @@ export async function handleInteraction(interaction) {
         components: [row]
       });
     }
+
+    if (action === 'editar_selecao') {
+      const baus = getBaus();
+      if (baus.length === 0) {
+        return await interaction.reply({
+          content: '❌ Não há nenhum baú cadastrado no momento para editar.',
+          ephemeral: true
+        });
+      }
+
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('painelconfig_select_bau_para_editar')
+        .setPlaceholder('Escolha o baú para editar...')
+        .addOptions(baus.map(b => ({
+          label: b.nome,
+          description: `Canal: #${guild.channels.cache.get(b.canalId)?.name || b.canalId}`,
+          value: b.messageId
+        })));
+
+      const btnBack = new ButtonBuilder()
+        .setCustomId('painelconfig_btn_back_bau')
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('↩️');
+
+      const rowSelect = new ActionRowBuilder().addComponents(select);
+      const rowBack = new ActionRowBuilder().addComponents(btnBack);
+
+      return await interaction.update({
+        content: 'Selecione abaixo qual baú você deseja configurar/editar:',
+        embeds: [],
+        components: [rowSelect, rowBack]
+      });
+    }
+
+    if (action.startsWith('edit_nome_')) {
+      const messageId = action.replace('edit_nome_', '');
+      const chest = getBau(messageId);
+      if (!chest) {
+        return await interaction.reply({ content: '❌ Baú não encontrado!', ephemeral: true });
+      }
+
+      const modal = new ModalBuilder()
+        .setCustomId(`painelconfig_modal_bau_edit_nome_${messageId}`)
+        .setTitle('Alterar Nome do Baú');
+
+      const input = new TextInputBuilder()
+        .setCustomId('bau_novo_nome_input')
+        .setLabel('NOVO NOME DO BAÚ')
+        .setStyle(TextInputStyle.Short)
+        .setValue(chest.nome)
+        .setRequired(true);
+
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
+      return await interaction.showModal(modal);
+    }
+
+    if (action.startsWith('edit_cargos_add_')) {
+      const messageId = action.replace('edit_cargos_add_', '');
+      const select = new RoleSelectMenuBuilder()
+        .setCustomId(`painelconfig_tempselect_bau_edit_add_${messageId}`)
+        .setPlaceholder('Escolha cargos para autorizar depósito...')
+        .setMinValues(1)
+        .setMaxValues(25);
+
+      const btnSave = new ButtonBuilder()
+        .setCustomId(`painelconfig_save_bau_edit_add_${messageId}`)
+        .setLabel('Salvar Cargos')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('💾');
+
+      const btnBack = new ButtonBuilder()
+        .setCustomId(`painelconfig_btn_bau_edit_voltar_${messageId}`)
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('↩️');
+
+      const row = new ActionRowBuilder().addComponents(select);
+      const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
+
+      return await interaction.update({
+        content: 'Selecione abaixo os cargos que podem depositar itens neste baú:',
+        embeds: [],
+        components: [row, rowBtns]
+      });
+    }
+
+    if (action.startsWith('edit_cargos_remove_')) {
+      const messageId = action.replace('edit_cargos_remove_', '');
+      const select = new RoleSelectMenuBuilder()
+        .setCustomId(`painelconfig_tempselect_bau_edit_remove_${messageId}`)
+        .setPlaceholder('Escolha cargos para autorizar retirada...')
+        .setMinValues(1)
+        .setMaxValues(25);
+
+      const btnSave = new ButtonBuilder()
+        .setCustomId(`painelconfig_save_bau_edit_remove_${messageId}`)
+        .setLabel('Salvar Cargos')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('💾');
+
+      const btnBack = new ButtonBuilder()
+        .setCustomId(`painelconfig_btn_bau_edit_voltar_${messageId}`)
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('↩️');
+
+      const row = new ActionRowBuilder().addComponents(select);
+      const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
+
+      return await interaction.update({
+        content: 'Selecione abaixo os cargos que podem retirar itens deste baú:',
+        embeds: [],
+        components: [row, rowBtns]
+      });
+    }
+
+    if (action.startsWith('edit_itens_')) {
+      const messageId = action.replace('edit_itens_', '');
+      const chest = getBau(messageId);
+      if (!chest) {
+        return await interaction.reply({ content: '❌ Baú não encontrado!', ephemeral: true });
+      }
+
+      const btnAdd = new ButtonBuilder()
+        .setCustomId(`painelconfig_btn_bau_item_excl_add_${messageId}`)
+        .setLabel('➕ Adicionar Item Exclusivo')
+        .setStyle(ButtonStyle.Success);
+
+      const btnRemove = new ButtonBuilder()
+        .setCustomId(`painelconfig_btn_bau_item_excl_remove_${messageId}`)
+        .setLabel('➖ Remover Item Exclusivo')
+        .setStyle(ButtonStyle.Danger);
+
+      const btnBack = new ButtonBuilder()
+        .setCustomId(`painelconfig_btn_bau_edit_voltar_${messageId}`)
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary);
+
+      const row = new ActionRowBuilder().addComponents(btnAdd, btnRemove, btnBack);
+
+      return await interaction.update({
+        content: `Selecione abaixo para gerenciar os itens exclusivos do baú **${chest.nome}**:`,
+        embeds: [],
+        components: [row]
+      });
+    }
+
+    if (action.startsWith('item_excl_add_')) {
+      const messageId = action.replace('item_excl_add_', '');
+      const modal = new ModalBuilder()
+        .setCustomId(`painelconfig_modal_bau_item_excl_add_${messageId}`)
+        .setTitle('Adicionar Item Exclusivo');
+
+      const input = new TextInputBuilder()
+        .setCustomId('item_excl_name_input')
+        .setLabel('NOME DO ITEM EXCLUSIVO')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMinLength(2)
+        .setMaxLength(30);
+
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
+      return await interaction.showModal(modal);
+    }
+
+    if (action.startsWith('item_excl_remove_')) {
+      const messageId = action.replace('item_excl_remove_', '');
+      const chest = getBau(messageId);
+
+      if (!chest) {
+        return await interaction.reply({ content: '❌ Baú não encontrado!', ephemeral: true });
+      }
+
+      const exclusiveItems = chest.itensExclusivos || [];
+      if (exclusiveItems.length === 0) {
+        return await interaction.reply({ content: '❌ Nenhum item exclusivo cadastrado neste baú para remover.', ephemeral: true });
+      }
+
+      const select = new StringSelectMenuBuilder()
+        .setCustomId(`painelconfig_select_bau_item_excl_remove_${messageId}`)
+        .setPlaceholder('Escolha o item exclusivo para remover...')
+        .addOptions(exclusiveItems.map(i => ({ label: i, value: i })));
+
+      const btnBack = new ButtonBuilder()
+        .setCustomId(`painelconfig_btn_bau_edit_voltar_${messageId}`)
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('↩️');
+
+      const row = new ActionRowBuilder().addComponents(select);
+      const rowBack = new ActionRowBuilder().addComponents(btnBack);
+
+      return await interaction.update({
+        content: `Selecione abaixo qual item exclusivo remover do baú **${chest.nome}**:`,
+        components: [row, rowBack]
+      });
+    }
+
+    if (action.startsWith('edit_excluir_')) {
+      const messageId = action.replace('edit_excluir_', '');
+      const chest = getBau(messageId);
+
+      if (!chest) {
+        return await interaction.reply({ content: '❌ Baú não encontrado!', ephemeral: true });
+      }
+
+      const embedConfirm = new EmbedBuilder()
+        .setTitle('⚠️ CONFIRMAR EXCLUSÃO DO BAÚ ⚠️')
+        .setDescription(
+          `Você tem certeza de que deseja excluir permanentemente o baú **${chest.nome}**?\n` +
+          `Esta ação irá deletar o baú do banco de dados, remover a mensagem correspondente no canal <#${chest.canalId}> e apagar os registros do estoque local.`
+        )
+        .setColor(15548997)
+        .setTimestamp();
+
+      const btnConfirm = new ButtonBuilder()
+        .setCustomId(`painelconfig_confirm_excluir_bau_${messageId}`)
+        .setLabel('Confirmar Exclusão')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🗑️');
+
+      const btnCancel = new ButtonBuilder()
+        .setCustomId(`painelconfig_btn_bau_edit_voltar_${messageId}`)
+        .setLabel('Cancelar')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('❌');
+
+      const row = new ActionRowBuilder().addComponents(btnConfirm, btnCancel);
+      return await interaction.update({ embeds: [embedConfirm], components: [row] });
+    }
+
+    if (action.startsWith('edit_voltar_')) {
+      const messageId = action.replace('edit_voltar_', '');
+      return await showEditBauMenu(interaction, messageId);
+    }
   }
 
   if (interaction.isButton() && customId === 'painelconfig_btn_back_bau') {
@@ -869,6 +1164,77 @@ export async function handleInteraction(interaction) {
   }
 
   // Criação de Baú: Modal Submit -> Canal -> Cargos -> Envio
+  if (interaction.isModalSubmit() && customId.startsWith('painelconfig_modal_bau_edit_nome_')) {
+    const messageId = customId.replace('painelconfig_modal_bau_edit_nome_', '');
+    const novoNome = interaction.fields.getTextInputValue('bau_novo_nome_input').trim();
+    const chest = getBau(messageId);
+
+    if (!chest) {
+      return await interaction.reply({ content: '❌ Baú não encontrado!', ephemeral: true });
+    }
+
+    const nomeAntigo = chest.nome;
+    chest.nome = novoNome;
+    saveBau(chest);
+
+    // Tentar atualizar a mensagem fixada do baú no canal correspondente
+    try {
+      const channel = await guild.channels.fetch(chest.canalId).catch(() => null);
+      if (channel) {
+        const msg = await channel.messages.fetch(messageId).catch(() => null);
+        if (msg && msg.embeds && msg.embeds.length > 0) {
+          const oldEmbed = msg.embeds[0];
+          const newEmbed = EmbedBuilder.from(oldEmbed)
+            .setTitle(`📦 BAÚ: ${novoNome.toUpperCase()} 📦`);
+          await msg.edit({ embeds: [newEmbed] });
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao editar embed da mensagem do baú no Discord:', e);
+    }
+
+    // Log de alteração de nome
+    const logEmbed = new EmbedBuilder()
+      .setTitle('⚙️ Nome do Baú Alterado')
+      .setColor(3447003)
+      .setDescription(`O administrador <@${interaction.user.id}> alterou o nome do baú de **${nomeAntigo}** para **${novoNome}** em <#${chest.canalId}>.`)
+      .setTimestamp();
+    await sendLog(interaction.client, guild, 'listarbau', logEmbed);
+
+    await showEditBauMenu(interaction, messageId);
+    return await interaction.followUp({ content: `✅ Nome do baú alterado para **${novoNome}** com sucesso!`, ephemeral: true });
+  }
+
+  if (interaction.isModalSubmit() && customId.startsWith('painelconfig_modal_bau_item_excl_add_')) {
+    const messageId = customId.replace('painelconfig_modal_bau_item_excl_add_', '');
+    const name = interaction.fields.getTextInputValue('item_excl_name_input').trim();
+    const chest = getBau(messageId);
+
+    if (!chest) {
+      return await interaction.reply({ content: '❌ Baú não encontrado!', ephemeral: true });
+    }
+
+    if (!chest.itensExclusivos) {
+      chest.itensExclusivos = [];
+    }
+
+    if (chest.itensExclusivos.map(i => i.toLowerCase()).includes(name.toLowerCase())) {
+      return await interaction.reply({ content: '❌ Este item já é exclusivo deste baú!', ephemeral: true });
+    }
+
+    // Também verificar se o item já existe globalmente
+    const globalItems = getBauItems();
+    if (globalItems.map(i => i.toLowerCase()).includes(name.toLowerCase())) {
+      return await interaction.reply({ content: '❌ Este item já existe globalmente nos baús!', ephemeral: true });
+    }
+
+    chest.itensExclusivos.push(name);
+    saveBau(chest);
+
+    await showEditBauMenu(interaction, messageId);
+    return await interaction.followUp({ content: `✅ Item exclusivo **${name}** adicionado com sucesso ao baú **${chest.nome}**!`, ephemeral: true });
+  }
+
   if (interaction.isModalSubmit() && customId === 'painelconfig_modal_bau_create') {
     const name = interaction.fields.getTextInputValue('bau_nome_input').trim();
     
@@ -1303,6 +1669,12 @@ export async function handleInteraction(interaction) {
       backCustomId = 'painelconfig_btn_back_farm';
     } else if (type.startsWith('bau_create_')) {
       backCustomId = 'painelconfig_btn_back_bau';
+    } else if (type.startsWith('bau_edit_add_')) {
+      const bMsgId = type.replace('bau_edit_add_', '');
+      backCustomId = `painelconfig_btn_bau_edit_voltar_${bMsgId}`;
+    } else if (type.startsWith('bau_edit_remove_')) {
+      const bMsgId = type.replace('bau_edit_remove_', '');
+      backCustomId = `painelconfig_btn_bau_edit_voltar_${bMsgId}`;
     } else if (type.startsWith('perfil_')) {
       backCustomId = 'painelconfig_btn_back_perfil';
     } else if (type.startsWith('simple_roles_')) {
@@ -1452,7 +1824,10 @@ export async function handleInteraction(interaction) {
           canalId: channelId,
           nome: name,
           cargosPermitidosIds: rolesIds,
-          itens: {}
+          cargosAdicionarIds: rolesIds,
+          cargosRetirarIds: rolesIds,
+          itens: {},
+          itensExclusivos: []
         });
 
         await interaction.update({
@@ -1479,6 +1854,36 @@ export async function handleInteraction(interaction) {
         await interaction.reply({ content: '❌ Erro ao instanciar o baú no canal.', ephemeral: true }).catch(() => null);
       }
       return;
+    }
+
+    if (payload.startsWith('bau_edit_add_')) {
+      const bMessageId = payload.replace('bau_edit_add_', '');
+      const roleIds = tempRoles || [];
+      const chest = getBau(bMessageId);
+      if (chest) {
+        chest.cargosAdicionarIds = roleIds;
+        saveBau(chest);
+      }
+      if (tempSelections.has(msgId)) {
+        delete tempSelections.get(msgId)[payload];
+      }
+      await showEditBauMenu(interaction, bMessageId);
+      return await interaction.followUp({ content: '✅ Cargos autorizados para depósito (adicionar) atualizados!', ephemeral: true });
+    }
+
+    if (payload.startsWith('bau_edit_remove_')) {
+      const bMessageId = payload.replace('bau_edit_remove_', '');
+      const roleIds = tempRoles || [];
+      const chest = getBau(bMessageId);
+      if (chest) {
+        chest.cargosRetirarIds = roleIds;
+        saveBau(chest);
+      }
+      if (tempSelections.has(msgId)) {
+        delete tempSelections.get(msgId)[payload];
+      }
+      await showEditBauMenu(interaction, bMessageId);
+      return await interaction.followUp({ content: '✅ Cargos autorizados para retirada (retirar) atualizados!', ephemeral: true });
     }
     
     if (payload.startsWith('simple_roles_') || payload.startsWith('simple_staff_') || payload.startsWith('simple_')) {
@@ -1687,17 +2092,18 @@ async function showBauMenu(interaction) {
     .setDescription(
       'Configure os baús interativos do servidor e itens permitidos:\n\n' +
       `**📦 Baús Criados:**\n${activeChestsStr}\n\n` +
-      `**📦 Itens de Inventário Ativos:**\n${items.map((it, i) => `  ${i+1}. **${it}**`).join('\n') || '  *Nenhum item cadastrado.*'}`
+      `**🌍 Itens Globais de Inventário:**\n${items.map((it, i) => `  ${i+1}. **${it}**`).join('\n') || '  *Nenhum item cadastrado.*'}`
     )
     .setColor(12096338)
     .setFooter({ text: `LuxBot Baús • ${dataAtual} • criado por chegaheitor` });
 
   const btnCriar = new ButtonBuilder().setCustomId('painelconfig_btn_bau_criar_bau').setLabel('Criar Novo Baú').setStyle(ButtonStyle.Success).setEmoji('📦');
-  const btnItems = new ButtonBuilder().setCustomId('painelconfig_btn_bau_items').setLabel('Editar Itens').setStyle(ButtonStyle.Primary).setEmoji('⚙️');
+  const btnItems = new ButtonBuilder().setCustomId('painelconfig_btn_bau_items').setLabel('Editar Itens Globais').setStyle(ButtonStyle.Primary).setEmoji('🌍');
+  const btnEditarBau = new ButtonBuilder().setCustomId('painelconfig_btn_bau_editar_selecao').setLabel('Editar Baú').setStyle(ButtonStyle.Primary).setEmoji('⚙️');
   const btnLimpar = new ButtonBuilder().setCustomId('painelconfig_btn_clear_bau').setLabel('Limpar Config').setStyle(ButtonStyle.Danger).setEmoji('🗑️');
   const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
 
-  const row = new ActionRowBuilder().addComponents(btnCriar, btnItems, btnLimpar, btnVoltar);
+  const row = new ActionRowBuilder().addComponents(btnCriar, btnItems, btnEditarBau, btnLimpar, btnVoltar);
 
   return await interaction.update({ embeds: [embed], components: [row] });
 }
@@ -1854,4 +2260,85 @@ async function showPerfilMenu(interaction) {
   const row = new ActionRowBuilder().addComponents(btnPessoal, btnAdmin, btnLimpar, btnVoltar);
 
   return await interaction.update({ embeds: [embed], components: [row] });
+}
+
+// Tela de Edição Individual de Baú (Opção A)
+async function showEditBauMenu(interaction, messageId) {
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
+  const chest = getBau(messageId);
+  if (!chest) {
+    return await interaction.reply({
+      content: '❌ Configuração do baú não encontrada no banco de dados.',
+      ephemeral: true
+    });
+  }
+
+  const formatRoles = (roleIds) => {
+    if (!roleIds || roleIds.length === 0) return '❌ *Nenhum cargo*';
+    return roleIds.map(id => `<@&${id}>`).join(', ');
+  };
+
+  const depositRoles = chest.cargosAdicionarIds || chest.cargosPermitidosIds || [];
+  const withdrawRoles = chest.cargosRetirarIds || chest.cargosPermitidosIds || [];
+  const exclusiveItems = chest.itensExclusivos || [];
+  const exclusiveItemsStr = exclusiveItems.map((it, i) => `  ${i+1}. **${it}**`).join('\n') || '  *Nenhum item exclusivo.*';
+
+  const embed = new EmbedBuilder()
+    .setTitle(`⚙️ CONFIGURAR BAÚ: ${chest.nome.toUpperCase()}`)
+    .setDescription(
+      `Aqui você pode editar os detalhes, permissões e itens exclusivos deste baú:\n\n` +
+      `• **Nome:** ${chest.nome}\n` +
+      `• **Canal:** <#${chest.canalId}>\n` +
+      `• **📥 Cargos Autorizados de Depósito (Adicionar):** ${formatRoles(depositRoles)}\n` +
+      `• **📤 Cargos Autorizados de Retirada (Retirar):** ${formatRoles(withdrawRoles)}\n\n` +
+      `• **💎 Itens Exclusivos do Baú:**\n${exclusiveItemsStr}`
+    )
+    .setColor(12096338)
+    .setFooter({ text: `LuxBot Baús • ${dataAtual} • criado por chegaheitor` });
+
+  const btnNome = new ButtonBuilder()
+    .setCustomId(`painelconfig_btn_bau_edit_nome_${messageId}`)
+    .setLabel('Alterar Nome')
+    .setStyle(ButtonStyle.Primary)
+    .setEmoji('✏️');
+
+  const btnCargosAdd = new ButtonBuilder()
+    .setCustomId(`painelconfig_btn_bau_edit_cargos_add_${messageId}`)
+    .setLabel('Cargos Depósito')
+    .setStyle(ButtonStyle.Primary)
+    .setEmoji('📥');
+
+  const btnCargosRemove = new ButtonBuilder()
+    .setCustomId(`painelconfig_btn_bau_edit_cargos_remove_${messageId}`)
+    .setLabel('Cargos Retirada')
+    .setStyle(ButtonStyle.Primary)
+    .setEmoji('📤');
+
+  const btnItens = new ButtonBuilder()
+    .setCustomId(`painelconfig_btn_bau_edit_itens_${messageId}`)
+    .setLabel('Itens Exclusivos')
+    .setStyle(ButtonStyle.Primary)
+    .setEmoji('💎');
+
+  const btnExcluir = new ButtonBuilder()
+    .setCustomId(`painelconfig_btn_bau_edit_excluir_${messageId}`)
+    .setLabel('Excluir Baú')
+    .setStyle(ButtonStyle.Danger)
+    .setEmoji('🗑️');
+
+  const btnVoltar = new ButtonBuilder()
+    .setCustomId('painelconfig_btn_back_bau')
+    .setLabel('Voltar')
+    .setStyle(ButtonStyle.Secondary)
+    .setEmoji('↩️');
+
+  const row1 = new ActionRowBuilder().addComponents(btnNome, btnCargosAdd, btnCargosRemove);
+  const row2 = new ActionRowBuilder().addComponents(btnItens, btnExcluir, btnVoltar);
+
+  const payload = { embeds: [embed], components: [row1, row2] };
+  if (interaction.replied || interaction.deferred) {
+    return await interaction.editReply(payload);
+  } else {
+    return await interaction.update(payload);
+  }
 }

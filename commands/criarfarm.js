@@ -147,11 +147,11 @@ export async function handleInteraction(interaction) {
 
         const permissionOverwrites = [
           {
-            id: guild.id, // @everyone
+            id: guild.roles.everyone.id,
             deny: [PermissionFlagsBits.ViewChannel]
           },
           {
-            id: userId, // Dono do farm
+            id: userId,
             allow: [
               PermissionFlagsBits.ViewChannel,
               PermissionFlagsBits.SendMessages,
@@ -161,22 +161,19 @@ export async function handleInteraction(interaction) {
           }
         ];
 
-        // Adicionar cargos admin autorizados
+        // Adicionar cargos de staff de farm configurados
         if (config.cargosAdminIds && Array.isArray(config.cargosAdminIds)) {
-          config.cargosAdminIds.forEach(roleId => {
-            if (roleId) {
-              permissionOverwrites.push({
-                id: roleId,
-                allow: [
-                  PermissionFlagsBits.ViewChannel,
-                  PermissionFlagsBits.SendMessages,
-                  PermissionFlagsBits.EmbedLinks,
-                  PermissionFlagsBits.ReadMessageHistory,
-                  PermissionFlagsBits.AddReactions
-                ]
-              });
-            }
-          });
+          for (const roleId of config.cargosAdminIds) {
+            permissionOverwrites.push({
+              id: roleId,
+              allow: [
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.EmbedLinks,
+                PermissionFlagsBits.ReadMessageHistory
+              ]
+            });
+          }
         }
 
         const newChannel = await guild.channels.create({
