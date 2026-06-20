@@ -8,6 +8,7 @@ import {
   TextInputBuilder, 
   TextInputStyle, 
   RoleSelectMenuBuilder, 
+  UserSelectMenuBuilder,
   ChannelType, 
   PermissionFlagsBits 
 } from 'discord.js';
@@ -115,9 +116,34 @@ export async function handleInteraction(interaction) {
         const canalPedidosId = parts[0];
         const canalLogsNegadoId = parts[1];
 
-        // Criar formulário modal de inscrição
+        const userSelect = new UserSelectMenuBuilder()
+          .setCustomId(`recrutamento_select_recrutador_${canalPedidosId}_${canalLogsNegadoId}`)
+          .setPlaceholder('Escolha quem recrutou você...')
+          .setMinValues(1)
+          .setMaxValues(1);
+
+        const row = new ActionRowBuilder().addComponents(userSelect);
+
+        await interaction.reply({
+          content: '👋 Para pedir seu set, selecione primeiro **quem recrutou você** na lista abaixo:',
+          components: [row],
+          ephemeral: true
+        });
+      } catch (error) {
+        console.error('Erro ao abrir o seletor de recrutamento:', error);
+        await interaction.reply({ content: 'Ocorreu um erro ao iniciar o processo.', ephemeral: true }).catch(() => null);
+      }
+    }
+
+    if (customId.startsWith('recrutamento_fill_form_btn_')) {
+      try {
+        const parts = customId.replace('recrutamento_fill_form_btn_', '').split('_');
+        const canalPedidosId = parts[0];
+        const canalLogsNegadoId = parts[1];
+        const recrutadorId = parts[2];
+
         const modal = new ModalBuilder()
-          .setCustomId(`embed_pedir_set_modal_${canalPedidosId}_${canalLogsNegadoId}`)
+          .setCustomId(`embed_pedir_set_modal_${canalPedidosId}_${canalLogsNegadoId}_${recrutadorId}`)
           .setTitle('✨ Pedido de Set - Lux ✨');
 
         const nomeInput = new TextInputBuilder()
@@ -141,13 +167,6 @@ export async function handleInteraction(interaction) {
           .setPlaceholder('Digite seu telefone (ex: 11 99999-9999)')
           .setRequired(true);
 
-        const recrutadorInput = new TextInputBuilder()
-          .setCustomId('recrutador_input')
-          .setLabel('📋 ID DE QUEM RECRUTOU')
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder('Digite o ID de quem recrutou você')
-          .setRequired(true);
-
         const cargoInput = new TextInputBuilder()
           .setCustomId('cargo_input')
           .setLabel('💼 CARGO')
@@ -159,14 +178,12 @@ export async function handleInteraction(interaction) {
           new ActionRowBuilder().addComponents(nomeInput),
           new ActionRowBuilder().addComponents(idInput),
           new ActionRowBuilder().addComponents(telefoneInput),
-          new ActionRowBuilder().addComponents(recrutadorInput),
           new ActionRowBuilder().addComponents(cargoInput)
         );
 
         await interaction.showModal(modal);
       } catch (error) {
-        console.error('Erro ao abrir o modal de recrutamento:', error);
-        await interaction.reply({ content: 'Ocorreu um erro ao abrir o formulário.', ephemeral: true });
+        console.error('Erro ao abrir modal de cadastro de recrutamento:', error);
       }
     }
 
@@ -204,6 +221,32 @@ export async function handleInteraction(interaction) {
         await interaction.reply({ content: 'Ocorreu um erro ao abrir o formulário de justificativa.', ephemeral: true });
       }
     }
+  }
+
+  // Tratar seleção de recrutador (Membro comum)
+  if (interaction.isUserSelectMenu() && customId.startsWith('recrutamento_select_recrutador_')) {
+    try {
+      const parts = customId.replace('recrutamento_select_recrutador_', '').split('_');
+      const canalPedidosId = parts[0];
+      const canalLogsNegadoId = parts[1];
+      const recrutadorId = interaction.values[0];
+
+      const btnForm = new ButtonBuilder()
+        .setCustomId(`recrutamento_fill_form_btn_${canalPedidosId}_${canalLogsNegadoId}_${recrutadorId}`)
+        .setLabel('Preencher Formulário')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('📋');
+
+      const row = new ActionRowBuilder().addComponents(btnForm);
+
+      await interaction.update({
+        content: `✅ Recrutador selecionado: <@${recrutadorId}>.\n\nClique no botão abaixo para preencher os seus dados cadastrais (Nome, ID, Telefone e Cargo desejado):`,
+        components: [row]
+      });
+    } catch (error) {
+      console.error('Erro ao selecionar recrutador:', error);
+    }
+    return;
   }
 
   // 2. Tratar interações com menus de seleção de cargo (Role Select Menu)
@@ -335,11 +378,11 @@ export async function handleInteraction(interaction) {
         const parts = customId.replace('embed_pedir_set_modal_', '').split('_');
         const canalPedidosId = parts[0];
         const canalLogsNegadoId = parts[1];
+        const recrutadorId = parts[2];
 
         const nome = interaction.fields.getTextInputValue('nome_input');
         const id = interaction.fields.getTextInputValue('id_input');
         const telefone = interaction.fields.getTextInputValue('telefone_input');
-        const recrutador = interaction.fields.getTextInputValue('recrutador_input');
         const cargoDesejado = interaction.fields.getTextInputValue('cargo_input');
 
         const user = interaction.user;
@@ -351,7 +394,7 @@ export async function handleInteraction(interaction) {
           nome: nome,
           gameId: id,
           telefone: telefone,
-          recrutadorId: recrutador,
+          recrutadorId: recrutadorId,
           cargo: cargoDesejado
         };
         savePendingRecruta(recrutaData);
@@ -364,7 +407,7 @@ export async function handleInteraction(interaction) {
             `🔠 NOME\n${nome}\n\n` +
             `💳 ID\n${id}\n\n` +
             `📞 TELEFONE\n${telefone}\n\n` +
-            `📋 ID DE QUEM RECRUTOU\n${recrutador}\n\n` +
+            `📋 QUEM RECRUTOU\n<@${recrutadorId}> (${recrutadorId})\n\n` +
             `💼 CARGO\n${cargoDesejado}\n\n`
           )
           .setColor(2326507)
@@ -391,7 +434,10 @@ export async function handleInteraction(interaction) {
 
         if (canalPedidos) {
           await canalPedidos.send({ embeds: [responseEmbed], components: [rowSelect, rowButton] });
-          await interaction.reply({ content: 'Seu pedido de set foi enviado com sucesso! Aguarde a revisão dos administradores. ✅', ephemeral: true });
+          await interaction.update({ 
+            content: 'Seu pedido de set foi enviado com sucesso! Aguarde a revisão dos administradores. ✅', 
+            components: [] 
+          });
 
           // Enviar log de novo pedido
           const logEmbed = new EmbedBuilder()
@@ -402,7 +448,7 @@ export async function handleInteraction(interaction) {
               { name: '🔠 Nome:', value: nome, inline: true },
               { name: '💳 ID:', value: id, inline: true },
               { name: '📞 Telefone:', value: telefone, inline: true },
-              { name: '📋 Recrutado por:', value: recrutador, inline: true },
+              { name: '📋 Recrutado por:', value: `<@${recrutadorId}>`, inline: true },
               { name: '💼 Cargo Desejado:', value: cargoDesejado, inline: true }
             )
             .setTimestamp();

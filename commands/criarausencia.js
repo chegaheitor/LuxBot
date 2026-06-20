@@ -226,12 +226,12 @@ export async function handleInteraction(interaction) {
       const config = getGlobalAusenciaConfig();
 
       const hasPermission = interaction.user.id === ausenteUserId
-        || (config && config.cargosPermitidosIds && Array.isArray(config.cargosPermitidosIds) && config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId)))
+        || (config && config.cargosStaffIds && Array.isArray(config.cargosStaffIds) && config.cargosStaffIds.some(roleId => interaction.member.roles.cache.has(roleId)))
         || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
       if (!hasPermission) {
         return await interaction.reply({
-          content: '❌ Apenas o próprio membro ausente, cargos autorizados ou administradores podem registrar o retorno!',
+          content: '❌ Apenas o próprio membro ausente, cargos staff ou administradores podem registrar o retorno!',
           ephemeral: true
         });
       }

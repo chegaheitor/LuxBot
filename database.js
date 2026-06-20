@@ -715,6 +715,36 @@ export function deleteRecruta(userId) {
   return saveDatabase({ ...db, recrutas: filtered });
 }
 
+export function updateRecruta(discordId, data = {}) {
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  const index = recrutas.findIndex(r => r.discordId === discordId);
+
+  if (index === -1) {
+    console.warn(`Tentativa de atualizar recruta não localizado no banco: ${discordId}`);
+    return false;
+  }
+
+  recrutas[index] = {
+    ...recrutas[index],
+    ...data,
+    updatedAt: new Date().toISOString()
+  };
+
+  return saveDatabase({ ...db, recrutas });
+}
+
+export function getGlobalPerfilConfig() {
+  const db = getDatabase();
+  return db.perfilConfig || { cargosPessoalIds: [], cargosAdminIds: [] };
+}
+
+export function saveGlobalPerfilConfig(config) {
+  const db = getDatabase();
+  db.perfilConfig = config;
+  return saveDatabase(db);
+}
+
 
 
 

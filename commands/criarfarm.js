@@ -311,7 +311,7 @@ export async function handleInteraction(interaction) {
             .setTitle('✅ FARM CONFIRMADO ✅')
             .setColor(3066993)
             .setDescription(
-              `­ƒæñ **Enviado por:** <@${userId}>\n` +
+              `👤 **Enviado por:** <@${userId}>\n` +
               `📦 **Recurso:** ${item}\n` +
               `🔢 **Quantidade:** ${quantidade}\n` +
               `📅 **Data:** ${dataStr}\n\n` +
@@ -322,7 +322,7 @@ export async function handleInteraction(interaction) {
             .setTitle('✅ FARM CONFIRMADO ✅')
             .setColor(3066993)
             .setDescription(
-              `­ƒæñ **Enviado por:** <@${userId}>\n` +
+              `👤 **Enviado por:** <@${userId}>\n` +
               `📦 **Recurso:** ${item}\n` +
               `🔢 **Quantidade:** ${quantidade}\n` +
               `📅 **Data:** ${dataStr}\n\n` +
@@ -397,7 +397,7 @@ export async function handleInteraction(interaction) {
             .setTitle('🌾 NOVO FARM DECLARADO 🌾')
             .setColor(2326507)
             .setDescription(
-              `­ƒæñ **Enviado por:** <@${userId}>\n` +
+              `👤 **Enviado por:** <@${userId}>\n` +
               `📦 **Recurso:** ${item}\n` +
               `🔢 **Quantidade:** ${quantidade}\n` +
               `📅 **Data:** ${dataStr}\n\n` +
@@ -408,7 +408,7 @@ export async function handleInteraction(interaction) {
             .setTitle('🌾 NOVO FARM DECLARADO 🌾')
             .setColor(2326507)
             .setDescription(
-              `­ƒæñ **Enviado por:** <@${userId}>\n` +
+              `👤 **Enviado por:** <@${userId}>\n` +
               `📦 **Recurso:** ${item}\n` +
               `🔢 **Quantidade:** ${quantidade}\n` +
               `📅 **Data:** ${dataStr}\n\n` +
@@ -450,9 +450,16 @@ export async function handleInteraction(interaction) {
       }
     }
 
-    // Botão Apagar Farm (sem necessidade de permissão administrativa)
+    // Botão Apagar Farm (Membro com permissão)
     if (customId === 'farm_apagar_declaracao_btn') {
       try {
+        const channelConfig = getFarmChannel(interaction.channelId);
+        const hasPermission = hasAdminPermission(interaction, channelConfig);
+
+        if (!hasPermission) {
+          return await interaction.reply({ content: '❌ Você não tem permissão para apagar esta declaração!', ephemeral: true });
+        }
+
         const originalEmbed = interaction.message.embeds[0];
         let desc = 'Uma declaração de farm pendente foi excluída.';
         if (originalEmbed && originalEmbed.description) {
@@ -550,7 +557,7 @@ export async function handleInteraction(interaction) {
 
       } catch (error) {
         console.error('Erro ao abrir modal de pagamento de meta:', error);
-        await interaction.reply({ content: 'Erro ao abrir formul├írio de confirmação de pagamento.', ephemeral: true });
+        await interaction.reply({ content: 'Erro ao abrir formulário de confirmação de pagamento.', ephemeral: true });
       }
     }
 
@@ -570,8 +577,8 @@ export async function handleInteraction(interaction) {
         // Remover do banco
         removePaidMeta(donoId);
 
-        // Remover reação 💩 (ou ­ƒÆ▓ caso o usuário clique em uma antiga)
-        const reaction = interaction.message.reactions.cache.find(r => r.emoji.name === '💩' || r.emoji.name === '­ƒÆ▓');
+        // Remover reação 💩 (ou 💰 caso o usuário clique em uma antiga)
+        const reaction = interaction.message.reactions.cache.find(r => r.emoji.name === '💩' || r.emoji.name === '💰');
         if (reaction) {
           await reaction.users.remove(interaction.client.user.id).catch(() => null);
         }
@@ -593,7 +600,7 @@ export async function handleInteraction(interaction) {
         const revertedEmbed = new EmbedBuilder()
           .setTitle('✨ META BATIDA ✨')
           .setDescription(
-            `­ƒæñ **Membro:** <@${donoId}>\n` +
+            `👤 **Membro:** <@${donoId}>\n` +
             `📅 **Data/Hora:** ${timestamp}\n\n` +
             `Aguardando a confirmação do pagamento pelos administradores.`
           )
@@ -707,16 +714,23 @@ export async function handleInteraction(interaction) {
       }
     }
 
-    // Botão Excluir Meta (Qualquer um com acesso)
+    // Botão Excluir Meta (Membro com permissão)
     if (customId === 'farm_excluir_meta_btn') {
       try {
+        const channelConfig = getFarmChannel(interaction.channelId);
+        const hasPermission = hasAdminPermission(interaction, channelConfig);
+
+        if (!hasPermission) {
+          return await interaction.reply({ content: '❌ Você não tem permissão para excluir esta meta!', ephemeral: true });
+        }
+
         const originalEmbed = interaction.message.embeds[0];
         let desc = 'Uma declaração de meta batida foi excluída.';
         if (originalEmbed && originalEmbed.description) {
           desc = `Uma declaração de meta batida foi excluída por <@${interaction.user.id}>:\n${originalEmbed.description}`;
         }
         const logEmbed = new EmbedBuilder()
-          .setTitle('🗑️ Declaração de Meta Exclu├¡da')
+          .setTitle('🗑️ Declaração de Meta Excluída')
           .setColor(15158332)
           .setDescription(desc)
           .setTimestamp();
@@ -758,7 +772,7 @@ export async function handleInteraction(interaction) {
         await interaction.showModal(modal);
       } catch (error) {
         console.error('Erro ao clicar em Meta Incompleta:', error);
-        await interaction.reply({ content: 'Erro ao abrir formul├írio de erro de meta.', ephemeral: true });
+        await interaction.reply({ content: 'Erro ao abrir formulário de erro de meta.', ephemeral: true });
       }
     }
 
@@ -783,13 +797,13 @@ export async function handleInteraction(interaction) {
         const row = new ActionRowBuilder().addComponents(confirmBtn);
 
         await interaction.reply({
-          content: '⚠️ **ATEN├ç├âO:** Você tem certeza de que deseja apagar esta pasta de farm? Todos os registros do canal ser├úo excluídos.',
+          content: '⚠️ **ATEN├ç├âO:** Você tem certeza de que deseja apagar esta pasta de farm? Todos os registros do canal serão excluídos.',
           components: [row],
           ephemeral: true
         });
       } catch (error) {
         console.error('Erro ao clicar em Apagar Pasta:', error);
-        await interaction.reply({ content: 'Erro ao abrir confirmação de exclus├úo.', ephemeral: true });
+        await interaction.reply({ content: 'Erro ao abrir confirmação de exclusão.', ephemeral: true });
       }
     }
 
@@ -807,10 +821,10 @@ export async function handleInteraction(interaction) {
         // Enviar log antes de deletar o canal
         const donoMencao = channelConfig ? `<@${channelConfig.donoId}>` : 'Desconhecido';
         const logEmbed = new EmbedBuilder()
-          .setTitle('🗑️ Pasta de Farm Exclu├¡da')
+          .setTitle('🗑️ Pasta de Farm Excluída')
           .setColor(15158332)
           .setDescription(`O administrador <@${interaction.user.id}> excluiu a pasta de farm de ${donoMencao}.`)
-          .addFields({ name: '­ƒôü Canal Exclu├¡do:', value: `${interaction.channel.name} (${interaction.channelId})` })
+          .addFields({ name: '📁 Canal Excluído:', value: `${interaction.channel.name} (${interaction.channelId})` })
           .setTimestamp();
         await sendLog(interaction.client, guild, 'registrofarm', logEmbed);
 
@@ -873,7 +887,7 @@ export async function handleInteraction(interaction) {
         await interaction.showModal(modal);
       } catch (error) {
         console.error('Erro ao processar select de farm:', error);
-        await interaction.reply({ content: 'Erro ao abrir formul├írio de quantidade.', ephemeral: true });
+        await interaction.reply({ content: 'Erro ao abrir formulário de quantidade.', ephemeral: true });
       }
     }
 
@@ -917,7 +931,7 @@ export async function handleInteraction(interaction) {
         await interaction.showModal(modal);
       } catch (error) {
         console.error('Erro ao processar select de meta:', error);
-        await interaction.reply({ content: 'Erro ao abrir formul├írio de meta.', ephemeral: true });
+        await interaction.reply({ content: 'Erro ao abrir formulário de meta.', ephemeral: true });
       }
     }
   }
@@ -940,7 +954,7 @@ export async function handleInteraction(interaction) {
         const embed = new EmbedBuilder()
           .setTitle('🌾 NOVO FARM DECLARADO 🌾')
           .setDescription(
-            `­ƒæñ **Enviado por:** <@${channelConfig.donoId}>\n` +
+            `👤 **Enviado por:** <@${channelConfig.donoId}>\n` +
             `📦 **Recurso:** ${item}\n` +
             `🔢 **Quantidade:** ${quantidade}\n` +
             `📅 **Data:** ${dataStr}\n\n` +
@@ -1005,7 +1019,7 @@ export async function handleInteraction(interaction) {
         const embed = new EmbedBuilder()
           .setTitle('✨ META BATIDA ✨')
           .setDescription(
-            `­ƒæñ **Membro:** <@${channelConfig.donoId}>\n` +
+            `👤 **Membro:** <@${channelConfig.donoId}>\n` +
             `📦 **Recurso:** ${item}\n` +
             `🔢 **Quantidade:** ${quantidade}\n` +
             `📅 **Data/Hora:** ${dataStr}\n\n` +
@@ -1068,7 +1082,7 @@ export async function handleInteraction(interaction) {
           data: dataStr
         });
 
-        // Reagir com 💩 (conforme requisitado para trocar ­ƒÆ▓ por 💩)
+        // Reagir com 💩 (conforme requisitado para trocar 💰 por 💩)
         await interaction.message.react('💩').catch(() => null);
 
         // Obter data da mensagem original
@@ -1082,7 +1096,7 @@ export async function handleInteraction(interaction) {
             .setTitle('💩 META PAGA 💩')
             .setColor(3066993)
             .setDescription(
-              `­ƒæñ **Membro:** <@${donoId}>\n` +
+              `👤 **Membro:** <@${donoId}>\n` +
               `📅 **Data da Meta:** ${dataMensagem}\n` +
               `💰 **Valor Pago:** ${valor}\n` +
               `💩 **Pago por:** <@${interaction.user.id}>\n` +
@@ -1093,7 +1107,7 @@ export async function handleInteraction(interaction) {
             .setTitle('💩 META PAGA 💩')
             .setColor(3066993)
             .setDescription(
-              `­ƒæñ **Membro:** <@${donoId}>\n` +
+              `👤 **Membro:** <@${donoId}>\n` +
               `📅 **Data da Meta:** ${dataMensagem}\n` +
               `💰 **Valor Pago:** ${valor}\n` +
               `💩 **Pago por:** <@${interaction.user.id}>\n` +
@@ -1160,7 +1174,7 @@ export async function handleInteraction(interaction) {
             .setTitle('⚠️ META INCOMPLETA ⚠️')
             .setColor(15158332)
             .setDescription(
-              `­ƒæñ **Membro:** <@${donoId}>\n` +
+              `👤 **Membro:** <@${donoId}>\n` +
               `❌ **Marcada como Incompleta por:** <@${interaction.user.id}>\n` +
               `📝 **Motivo:** *${motivo}*\n` +
               `📅 **Data/Hora:** ${timestamp}`

@@ -1,14 +1,14 @@
-import { 
-  SlashCommandBuilder, 
-  PermissionFlagsBits, 
-  EmbedBuilder, 
-  ActionRowBuilder, 
-  ButtonBuilder, 
-  ButtonStyle, 
-  ModalBuilder, 
-  TextInputBuilder, 
-  TextInputStyle, 
-  ChannelType 
+import {
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ChannelType
 } from 'discord.js';
 import { getGlobalEncomendaConfig, addEncomenda } from '../database.js';
 import { sendLog } from '../logs.js';
@@ -19,6 +19,16 @@ function hasEncomendaPermission(interaction, config) {
   }
   if (config && config.cargosPermitidosIds && Array.isArray(config.cargosPermitidosIds)) {
     return config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId));
+  }
+  return false;
+}
+
+function hasEncomendaStaffPermission(interaction, config) {
+  if (interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return true;
+  }
+  if (config && config.cargosStaffIds && Array.isArray(config.cargosStaffIds)) {
+    return config.cargosStaffIds.some(roleId => interaction.member.roles.cache.has(roleId));
   }
   return false;
 }
@@ -55,7 +65,7 @@ export async function criarPainelEncomenda(client, guild) {
   try {
     const config = getGlobalEncomendaConfig();
     const dataAtual = new Date().toLocaleDateString('pt-BR');
-    
+
     if (!config || !config.forumCanalId) return false;
 
     const canalForum = guild.channels.cache.get(config.forumCanalId)
@@ -137,7 +147,7 @@ export async function handleInteraction(interaction) {
 
       const clienteInput = new TextInputBuilder()
         .setCustomId('cliente_input')
-        .setLabel('PARA QUEM ├ë')
+        .setLabel('PARA QUEM É')
         .setStyle(TextInputStyle.Short)
         .setPlaceholder('Digite o nome ou ID do cliente')
         .setRequired(true);
@@ -160,7 +170,7 @@ export async function handleInteraction(interaction) {
         .setCustomId('data_input')
         .setLabel('DATA DE ENTREGA')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Ex: DD/MM/AAAA ou Hoje ├á noite')
+        .setPlaceholder('Ex: DD/MM/AAAA ou Hoje à noite')
         .setRequired(true);
 
       const parceriaInput = new TextInputBuilder()
@@ -184,7 +194,7 @@ export async function handleInteraction(interaction) {
     } catch (error) {
       console.error('Erro ao abrir modal de encomendas:', error);
       await interaction.reply({
-        content: '❌ Ocorreu um erro ao abrir o formul├írio de encomenda.',
+        content: '❌ Ocorreu um erro ao abrir o formulário de encomenda.',
         ephemeral: true
       });
     }
@@ -197,7 +207,7 @@ export async function handleInteraction(interaction) {
       const forumId = interaction.channel.parentId;
       if (!forumId) {
         return await interaction.reply({
-          content: '❌ Erro: Não foi poss├¡vel obter o canal do fórum.',
+          content: '❌ Erro: Não foi possível obter o canal do fórum.',
           ephemeral: true
         });
       }
@@ -220,22 +230,22 @@ export async function handleInteraction(interaction) {
         .setTitle('⏳ ENCOMENDA PENDENTE ⏳')
         .setDescription('Nova encomenda registrada e aguardando produção.')
         .addFields(
-          { name: '­ƒæñ Cliente:', value: cliente, inline: true },
+          { name: '👤 Cliente:', value: cliente, inline: true },
           { name: '🔢 Quantidade:', value: qtd, inline: true },
           { name: '💰 Valor:', value: valor, inline: true },
-          { name: '📅 Entrega at├®:', value: dataEntrega, inline: true },
-          { name: '­ƒñØ Parceria:', value: parceria, inline: true },
-          { name: '­ƒÆ╝ Registrado por:', value: `<@${interaction.user.id}>`, inline: true },
+          { name: '📅 Entrega até:', value: dataEntrega, inline: true },
+          { name: '🤝 Parceria:', value: parceria, inline: true },
+          { name: '💼 Registrado por:', value: `<@${interaction.user.id}>`, inline: true },
           { name: 'ℹ️ Status:', value: '⏳ Pendente', inline: true }
         )
         .setColor(15844367) // Dourado/Amarelo
         .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
-      // Bot├Áes do Estado Pendente: Iniciar Produ├º├úo e Excluir Encomenda
+      // Botões do Estado Pendente: Iniciar Produção e Excluir Encomenda
       const btnProduzir = new ButtonBuilder()
         .setCustomId(`encomenda_produzir_btn_${interaction.user.id}`)
-        .setLabel('Iniciar Produ├º├úo')
+        .setLabel('Iniciar Produção')
         .setStyle(ButtonStyle.Primary)
         .setEmoji('🏭');
 
@@ -249,7 +259,7 @@ export async function handleInteraction(interaction) {
 
       // Criar novo tópico no fórum correspondente
       const newThread = await forumChannel.threads.create({
-        name: `⏳ÔöâPendente - ${cliente} - ${dataEntrega}`,
+        name: `⏳ Pendente - ${cliente} - ${dataEntrega}`,
         message: {
           embeds: [orderEmbed],
           components: [rowButtons]
@@ -273,11 +283,11 @@ export async function handleInteraction(interaction) {
         .setColor(15844367)
         .setDescription(`O membro <@${interaction.user.id}> registrou uma nova encomenda no fórum ${forumChannel}.`)
         .addFields(
-          { name: '­ƒæñ Cliente:', value: cliente, inline: true },
+          { name: '👤 Cliente:', value: cliente, inline: true },
           { name: '🔢 Quantidade:', value: qtd, inline: true },
           { name: '💰 Valor:', value: valor, inline: true },
           { name: '📅 Entrega:', value: dataEntrega, inline: true },
-          { name: '­ƒñØ Parceria:', value: parceria, inline: true }
+          { name: '🤝 Parceria:', value: parceria, inline: true }
         )
         .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
@@ -294,14 +304,14 @@ export async function handleInteraction(interaction) {
     return;
   }
 
-  // 3. Botão Iniciar Produ├º├úo clicado (Vai para Estado: Em Produ├º├úo)
+  // 3. Botão Iniciar Produção clicado (Vai para Estado: Em Produção)
   if (customId.startsWith('encomenda_produzir_btn_')) {
     try {
       const donoId = customId.replace('encomenda_produzir_btn_', '');
       const forumId = interaction.channel.parentId;
 
       const config = getGlobalEncomendaConfig();
-      const hasPermission = hasEncomendaPermission(interaction, config);
+      const hasPermission = hasEncomendaStaffPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
@@ -330,27 +340,27 @@ export async function handleInteraction(interaction) {
       await interaction.message.react('🏭').catch(() => null);
 
       // Atualizar nome do tópico/canal
-      await interaction.channel.setName(`🏭ÔöâProdu├º├úo - ${cliente} - ${dataEntrega}`).catch(() => null);
+      await interaction.channel.setName(`🏭 Produção - ${cliente} - ${dataEntrega}`).catch(() => null);
 
       // Novo embed em produção
       const updatedEmbed = new EmbedBuilder()
         .setTitle('🏭 ENCOMENDA EM PRODUÇÃO 🏭')
         .setDescription('A fabricação dos itens solicitados foi iniciada.')
         .addFields(
-          { name: '­ƒæñ Cliente:', value: cliente, inline: true },
+          { name: '👤 Cliente:', value: cliente, inline: true },
           { name: '🔢 Quantidade:', value: qtd, inline: true },
           { name: '💰 Valor:', value: valor, inline: true },
-          { name: '📅 Entrega at├®:', value: dataEntrega, inline: true },
-          { name: '­ƒñØ Parceria:', value: parceria, inline: true },
-          { name: '­ƒÆ╝ Registrado por:', value: vendedorMencao, inline: true },
-          { name: '🏭 Produ├º├úo por:', value: `<@${interaction.user.id}>`, inline: true },
-          { name: 'ℹ️ Status:', value: '🏭 Em Produ├º├úo', inline: true }
+          { name: '📅 Entrega até:', value: dataEntrega, inline: true },
+          { name: '🤝 Parceria:', value: parceria, inline: true },
+          { name: '💼 Registrado por:', value: vendedorMencao, inline: true },
+          { name: '🏭 Produção por:', value: `<@${interaction.user.id}>`, inline: true },
+          { name: 'ℹ️ Status:', value: '🏭 Em Produção', inline: true }
         )
         .setColor(3447003) // Azul
         .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
-      // Bot├Áes do Estado Em Produ├º├úo: Entregar Encomenda, Voltar a Pendente e Excluir Encomenda
+      // Botões do Estado Em Produção: Entregar Encomenda, Voltar a Pendente e Excluir Encomenda
       const btnEntregar = new ButtonBuilder()
         .setCustomId(`encomenda_entregar_btn_${donoId}`)
         .setLabel('Entregar Encomenda')
@@ -400,7 +410,7 @@ export async function handleInteraction(interaction) {
       const forumId = interaction.channel.parentId;
 
       const config = getGlobalEncomendaConfig();
-      const hasPermission = hasEncomendaPermission(interaction, config);
+      const hasPermission = hasEncomendaStaffPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
@@ -411,7 +421,7 @@ export async function handleInteraction(interaction) {
 
       const originalEmbed = interaction.message.embeds[0];
       const statusField = originalEmbed.fields.find(f => f.name.toLowerCase().includes('status'));
-      const isProducing = originalEmbed.title.toLowerCase().includes('produção') 
+      const isProducing = originalEmbed.title.toLowerCase().includes('produção')
         || (statusField && statusField.value.toLowerCase().includes('produção'));
 
       if (!isProducing) {
@@ -433,35 +443,35 @@ export async function handleInteraction(interaction) {
       const dataEntrega = getFieldValue('Entrega');
       const parceria = getFieldValue('Parceria');
       const vendedorMencao = getFieldValue('Registrado');
-      const produtorMencao = getFieldValue('Produ├º├úo por');
+      const produtorMencao = getFieldValue('Produção por');
 
       // Limpar reações antigas e reagir com ✅
       await interaction.message.reactions.removeAll().catch(() => null);
       await interaction.message.react('✅').catch(() => null);
 
       // Atualizar nome do tópico/canal
-      await interaction.channel.setName(`✅ÔöâEntregue - ${cliente} - ${dataEntrega}`).catch(() => null);
+      await interaction.channel.setName(`✅ Entregue - ${cliente} - ${dataEntrega}`).catch(() => null);
 
       // Novo embed entregue
       const updatedEmbed = new EmbedBuilder()
         .setTitle('✅ ENCOMENDA ENTREGUE ✅')
         .setDescription('Encomenda entregue ao cliente e finalizada.')
         .addFields(
-          { name: '­ƒæñ Cliente:', value: cliente, inline: true },
+          { name: '👤 Cliente:', value: cliente, inline: true },
           { name: '🔢 Quantidade:', value: qtd, inline: true },
           { name: '💰 Valor:', value: valor, inline: true },
-          { name: '📅 Entrega at├®:', value: dataEntrega, inline: true },
-          { name: '­ƒñØ Parceria:', value: parceria, inline: true },
-          { name: '­ƒÆ╝ Registrado por:', value: vendedorMencao, inline: true },
+          { name: '📅 Entrega até:', value: dataEntrega, inline: true },
+          { name: '🤝 Parceria:', value: parceria, inline: true },
+          { name: '💼 Registrado por:', value: vendedorMencao, inline: true },
           { name: '🏭 Produzido por:', value: produtorMencao, inline: true },
-          { name: '­ƒÄü Entregue por:', value: `<@${interaction.user.id}>`, inline: true },
+          { name: '🎁 Entregue por:', value: `<@${interaction.user.id}>`, inline: true },
           { name: 'ℹ️ Status:', value: '✅ Entregue', inline: true }
         )
         .setColor(3066993) // Verde
         .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
-      // Bot├Áes do Estado Entregue: Voltar a Pendente e Excluir Encomenda
+      // Botões do Estado Entregue: Voltar a Pendente e Excluir Encomenda
       const btnVoltar = new ButtonBuilder()
         .setCustomId(`encomenda_pendente_btn_${donoId}`)
         .setLabel('Voltar a Pendente')
@@ -505,7 +515,7 @@ export async function handleInteraction(interaction) {
       const forumId = interaction.channel.parentId;
 
       const config = getGlobalEncomendaConfig();
-      const hasPermission = hasEncomendaPermission(interaction, config);
+      const hasPermission = hasEncomendaStaffPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
@@ -533,29 +543,29 @@ export async function handleInteraction(interaction) {
       await interaction.message.reactions.removeAll().catch(() => null);
 
       // Reverter nome do tópico/canal
-      await interaction.channel.setName(`⏳ÔöâPendente - ${cliente} - ${dataEntrega}`).catch(() => null);
+      await interaction.channel.setName(`⏳ Pendente - ${cliente} - ${dataEntrega}`).catch(() => null);
 
       // Reverter embed para pendente
       const revertedEmbed = new EmbedBuilder()
         .setTitle('⏳ ENCOMENDA PENDENTE ⏳')
         .setDescription('Encomenda restaurada ao status pendente.')
         .addFields(
-          { name: '­ƒæñ Cliente:', value: cliente, inline: true },
+          { name: '👤 Cliente:', value: cliente, inline: true },
           { name: '🔢 Quantidade:', value: qtd, inline: true },
           { name: '💰 Valor:', value: valor, inline: true },
-          { name: '📅 Entrega at├®:', value: dataEntrega, inline: true },
-          { name: '­ƒñØ Parceria:', value: parceria, inline: true },
-          { name: '­ƒÆ╝ Registrado por:', value: vendedorMencao, inline: true },
+          { name: '📅 Entrega até:', value: dataEntrega, inline: true },
+          { name: '🤝 Parceria:', value: parceria, inline: true },
+          { name: '💼 Registrado por:', value: vendedorMencao, inline: true },
           { name: 'ℹ️ Status:', value: '⏳ Pendente', inline: true }
         )
         .setColor(15844367) // Dourado
         .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
-      // Bot├Áes do Estado Pendente: Iniciar Produ├º├úo e Excluir Encomenda
+      // Botões do Estado Pendente: Iniciar Produção e Excluir Encomenda
       const btnProduzir = new ButtonBuilder()
         .setCustomId(`encomenda_produzir_btn_${donoId}`)
-        .setLabel('Iniciar Produ├º├úo')
+        .setLabel('Iniciar Produção')
         .setStyle(ButtonStyle.Primary)
         .setEmoji('🏭');
 
@@ -572,7 +582,7 @@ export async function handleInteraction(interaction) {
         components: [rowButtons]
       });
 
-      // Enviar log de revers├úo
+      // Enviar log de reversão
       const logEmbed = new EmbedBuilder()
         .setTitle('⏳ ENCOMENDA VOLTOU A PENDENTE ⏳')
         .setColor(15844367)
@@ -595,7 +605,7 @@ export async function handleInteraction(interaction) {
       const forumId = interaction.channel.parentId;
 
       const config = getGlobalEncomendaConfig();
-      const hasPermission = hasEncomendaPermission(interaction, config);
+      const hasPermission = hasEncomendaStaffPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
@@ -606,7 +616,7 @@ export async function handleInteraction(interaction) {
 
       const thread = interaction.channel;
 
-      // Enviar log de exclus├úo
+      // Enviar log de exclusão
       const logEmbed = new EmbedBuilder()
         .setTitle('🗑️ ENCOMENDA EXCLUÍDA 🗑️')
         .setColor(15158332)

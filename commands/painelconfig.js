@@ -36,7 +36,9 @@ import {
   getGlobalFarmConfig,
   saveGlobalFarmConfig,
   getGlobalRecrutamentoConfig,
-  saveGlobalRecrutamentoConfig
+  saveGlobalRecrutamentoConfig,
+  getGlobalPerfilConfig,
+  saveGlobalPerfilConfig
 } from '../database.js';
 import { sendLog } from '../logs.js';
 
@@ -67,6 +69,7 @@ export function generateMainEmbed() {
   const encomenda = getGlobalEncomendaConfig();
   const ausencia = getGlobalAusenciaConfig();
   const recrutamento = getGlobalRecrutamentoConfig();
+  const perfil = getGlobalPerfilConfig();
 
   const advAlertStr = adv?.canalId ? `<#${adv.canalId}>` : '❌ *Não Configurado*';
   const advRevStr = adv?.canalRevogacaoId ? `<#${adv.canalRevogacaoId}>` : '❌ *Não Configurado*';
@@ -75,6 +78,8 @@ export function generateMainEmbed() {
   const encomendaPanelStr = encomenda?.forumCanalId ? `<#${encomenda.forumCanalId}>` : '❌ *Não Configurado*';
   const ausenciaPanelStr = ausencia?.canalId ? `<#${ausencia.canalId}>` : '❌ *Não Configurado*';
   const recPanelStr = recrutamento?.canalPainelId ? `<#${recrutamento.canalPainelId}>` : '❌ *Não Configurado*';
+  const perfilPessoalCount = perfil?.cargosPessoalIds?.length || 0;
+  const perfilAdminCount = perfil?.cargosAdminIds?.length || 0;
 
   return new EmbedBuilder()
     .setTitle('⚙️ PAINEL DE CONFIGURAÇÕES GERAIS ⚙️')
@@ -88,7 +93,8 @@ export function generateMainEmbed() {
       `• **🛍️ Vendas**: Painel em ${vendaPanelStr}\n` +
       `• **📦 Encomendas**: Painel em ${encomendaPanelStr}\n` +
       `• **🔴 Ausências**: Painel em ${ausenciaPanelStr}\n` +
-      `• **👥 Recrutamento**: Painel em ${recPanelStr}\n`
+      `• **👥 Recrutamento**: Painel em ${recPanelStr}\n` +
+      `• **👤 Perfil**: Pessoal: \`${perfilPessoalCount}\` cargo(s) | Admins: \`${perfilAdminCount}\` cargo(s)\n`
     )
     .setColor(2326507)
     .setFooter({ text: `LuxBot Configurações • ${dataAtual} • criado por chegaheitor` })
@@ -108,6 +114,7 @@ export function generateMainRow() {
       { label: '📦 Encomendas', description: 'Fórum de encomendas e cargos autorizados', value: 'painelconfig_mod_encomenda' },
       { label: '🔴 Ausências', description: 'Canal de ausências e cargos autorizados', value: 'painelconfig_mod_ausencia' },
       { label: '👥 Recrutamento', description: 'Canais de inscrição, aprovação e logs', value: 'painelconfig_mod_recrutamento' },
+      { label: '👤 Perfil', description: 'Cargos autorizados a alterar informações de perfis', value: 'painelconfig_mod_perfil' },
       { label: '📋 Logs', description: 'Configurar canais de logs por comando', value: 'painelconfig_mod_logs' }
     ]);
 
@@ -192,6 +199,11 @@ export async function handleInteraction(interaction) {
     // MÓDULO BAÚ
     if (selected === 'painelconfig_mod_bau') {
       return await showBauMenu(interaction);
+    }
+
+    // MÓDULO PERFIL
+    if (selected === 'painelconfig_mod_perfil') {
+      return await showPerfilMenu(interaction);
     }
 
     // MÓDULOS DE FLUXO SIMPLES (Vendas, Encomendas, Ausências, Recrutamento)
@@ -353,6 +365,7 @@ export async function handleInteraction(interaction) {
     if (moduleName === 'adv') return await showAdvMenu(interaction);
     if (moduleName === 'farm') return await showFarmMenu(interaction);
     if (moduleName === 'bau') return await showBauMenu(interaction);
+    if (moduleName === 'perfil') return await showPerfilMenu(interaction);
     if (moduleName.startsWith('simple_')) {
       const simpleMod = moduleName.replace('simple_', '');
       return await showSimpleModuleMenu(interaction, simpleMod);
@@ -393,6 +406,12 @@ export async function handleInteraction(interaction) {
       saveDatabase(db);
       await interaction.reply({ content: '✅ Todas as configurações de Baús foram limpas com sucesso!', ephemeral: true });
       return await showBauMenu(interaction);
+    }
+    
+    if (moduleName === 'perfil') {
+      saveGlobalPerfilConfig({ cargosPessoalIds: [], cargosAdminIds: [] });
+      await interaction.reply({ content: '✅ Todas as configurações de Perfil foram limpas com sucesso!', ephemeral: true });
+      return await showPerfilMenu(interaction);
     }
     
     if (moduleName.startsWith('simple_')) {
@@ -975,6 +994,71 @@ export async function handleInteraction(interaction) {
   }
 
   // ========================================================
+  // MÓDULO PERFIL: CONFIGURAÇÕES E INTERAÇÕES
+  // ========================================================
+  if (interaction.isButton() && customId.startsWith('painelconfig_btn_perfil_')) {
+    const action = customId.replace('painelconfig_btn_perfil_', '');
+    
+    if (action === 'roles_pessoal') {
+      const select = new RoleSelectMenuBuilder()
+        .setCustomId('painelconfig_tempselect_perfil_pessoal')
+        .setPlaceholder('Escolha os cargos para dados pessoais...')
+        .setMinValues(1)
+        .setMaxValues(25);
+
+      const btnSave = new ButtonBuilder()
+        .setCustomId('painelconfig_save_perfil_pessoal')
+        .setLabel('Salvar Cargos')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('💾');
+
+      const btnBack = new ButtonBuilder()
+        .setCustomId('painelconfig_btn_back_perfil')
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('↩️');
+
+      const row = new ActionRowBuilder().addComponents(select);
+      const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
+      return await interaction.update({
+        content: 'Selecione abaixo os cargos que podem alterar dados pessoais do perfil (Nome, ID, Telefone):',
+        components: [row, rowBtns]
+      });
+    }
+
+    if (action === 'roles_admin') {
+      const select = new RoleSelectMenuBuilder()
+        .setCustomId('painelconfig_tempselect_perfil_admin')
+        .setPlaceholder('Escolha os cargos para dados administrativos...')
+        .setMinValues(1)
+        .setMaxValues(25);
+
+      const btnSave = new ButtonBuilder()
+        .setCustomId('painelconfig_save_perfil_admin')
+        .setLabel('Salvar Cargos')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('💾');
+
+      const btnBack = new ButtonBuilder()
+        .setCustomId('painelconfig_btn_back_perfil')
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('↩️');
+
+      const row = new ActionRowBuilder().addComponents(select);
+      const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
+      return await interaction.update({
+        content: 'Selecione abaixo os cargos que podem alterar dados administrativos (Cargo, Recrutador, Set) e Excluir Perfis:',
+        components: [row, rowBtns]
+      });
+    }
+  }
+
+  if (interaction.isButton() && customId === 'painelconfig_btn_back_perfil') {
+    return await showPerfilMenu(interaction);
+  }
+
+  // ========================================================
   // MÓDULOS DE FLUXO SIMPLES: EDITAR CANAIS, CARGOS E CRIAR PAINEL
   // ========================================================
   if (interaction.isButton() && customId.startsWith('painelconfig_btn_simple_')) {
@@ -1047,13 +1131,13 @@ export async function handleInteraction(interaction) {
       }
 
       const select = new RoleSelectMenuBuilder()
-        .setCustomId(`painelconfig_tempselect_simple_${moduleName}`)
-        .setPlaceholder(`Selecione os cargos para ${moduleName}...`)
+        .setCustomId(`painelconfig_tempselect_simple_roles_${moduleName}`)
+        .setPlaceholder(`Selecione os cargos para usar ${moduleName}...`)
         .setMinValues(1)
         .setMaxValues(25);
 
       const btnSave = new ButtonBuilder()
-        .setCustomId(`painelconfig_save_simple_${moduleName}`)
+        .setCustomId(`painelconfig_save_simple_roles_${moduleName}`)
         .setLabel('Salvar Cargos')
         .setStyle(ButtonStyle.Success)
         .setEmoji('💾');
@@ -1067,7 +1151,43 @@ export async function handleInteraction(interaction) {
       const row = new ActionRowBuilder().addComponents(select);
       const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
       return await interaction.update({
-        content: `Selecione abaixo os cargos permitidos para o módulo **${moduleName}**:`,
+        content: `Selecione abaixo os cargos com permissão para usar/registrar no módulo **${moduleName}**:`,
+        components: [row, rowBtns]
+      });
+    }
+
+    if (action === 'staff') {
+      let existingRoles = [];
+      if (moduleName === 'venda') {
+        existingRoles = getGlobalVendaConfig()?.cargosStaffIds || [];
+      } else if (moduleName === 'encomenda') {
+        existingRoles = getGlobalEncomendaConfig()?.cargosStaffIds || [];
+      } else if (moduleName === 'ausencia') {
+        existingRoles = getGlobalAusenciaConfig()?.cargosStaffIds || [];
+      }
+
+      const select = new RoleSelectMenuBuilder()
+        .setCustomId(`painelconfig_tempselect_simple_staff_${moduleName}`)
+        .setPlaceholder(`Selecione os cargos staff para gerenciar ${moduleName}...`)
+        .setMinValues(1)
+        .setMaxValues(25);
+
+      const btnSave = new ButtonBuilder()
+        .setCustomId(`painelconfig_save_simple_staff_${moduleName}`)
+        .setLabel('Salvar Cargos')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('💾');
+
+      const btnBack = new ButtonBuilder()
+        .setCustomId(`painelconfig_btn_back_simple_${moduleName}`)
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('↩️');
+
+      const row = new ActionRowBuilder().addComponents(select);
+      const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
+      return await interaction.update({
+        content: `Selecione abaixo os cargos staff com permissão para gerenciar/auditar no módulo **${moduleName}**:`,
         components: [row, rowBtns]
       });
     }
@@ -1160,7 +1280,11 @@ export async function handleInteraction(interaction) {
     const cargosListStr = rolesIds.map(id => `<@&${id}>`).join(', ');
     
     // Criar o mesmo menu select novamente para que o usuário possa re-selecionar se quiser
-    const originalSelect = RoleSelectMenuBuilder.from(interaction.component);
+    const originalSelect = new RoleSelectMenuBuilder()
+      .setCustomId(interaction.component.customId || customId)
+      .setPlaceholder(interaction.component.placeholder || 'Escolha os cargos...')
+      .setMinValues(interaction.component.minValues ?? 1)
+      .setMaxValues(interaction.component.maxValues ?? 25);
     
     // Botão salvar (agora o customId é fixo e dinâmico na leitura via cache!)
     const btnSave = new ButtonBuilder()
@@ -1179,6 +1303,14 @@ export async function handleInteraction(interaction) {
       backCustomId = 'painelconfig_btn_back_farm';
     } else if (type.startsWith('bau_create_')) {
       backCustomId = 'painelconfig_btn_back_bau';
+    } else if (type.startsWith('perfil_')) {
+      backCustomId = 'painelconfig_btn_back_perfil';
+    } else if (type.startsWith('simple_roles_')) {
+      const mod = type.replace('simple_roles_', '');
+      backCustomId = `painelconfig_btn_back_simple_${mod}`;
+    } else if (type.startsWith('simple_staff_')) {
+      const mod = type.replace('simple_staff_', '');
+      backCustomId = `painelconfig_btn_back_simple_${mod}`;
     } else if (type.startsWith('simple_')) {
       const mod = type.replace('simple_', '');
       backCustomId = `painelconfig_btn_back_simple_${mod}`;
@@ -1204,6 +1336,32 @@ export async function handleInteraction(interaction) {
     const payload = customId.replace('painelconfig_save_', '');
     const msgId = interaction.message.id;
     const tempRoles = tempSelections.get(msgId)?.[payload];
+    
+    if (payload === 'perfil_pessoal') {
+      const roleIds = tempRoles || getGlobalPerfilConfig()?.cargosPessoalIds || [];
+      const config = getGlobalPerfilConfig();
+      config.cargosPessoalIds = roleIds;
+      saveGlobalPerfilConfig(config);
+      await showPerfilMenu(interaction);
+      
+      if (tempSelections.has(msgId)) {
+        delete tempSelections.get(msgId)[payload];
+      }
+      return await interaction.followUp({ content: '✅ Cargos permitidos para alterar dados pessoais salvos!', ephemeral: true });
+    }
+
+    if (payload === 'perfil_admin') {
+      const roleIds = tempRoles || getGlobalPerfilConfig()?.cargosAdminIds || [];
+      const config = getGlobalPerfilConfig();
+      config.cargosAdminIds = roleIds;
+      saveGlobalPerfilConfig(config);
+      await showPerfilMenu(interaction);
+      
+      if (tempSelections.has(msgId)) {
+        delete tempSelections.get(msgId)[payload];
+      }
+      return await interaction.followUp({ content: '✅ Cargos permitidos para gerenciar dados administrativos salvos!', ephemeral: true });
+    }
     
     if (payload === 'adv_staff') {
       const roleIds = tempRoles || getAdvConfig()?.cargosStaffIds || [];
@@ -1323,16 +1481,28 @@ export async function handleInteraction(interaction) {
       return;
     }
     
-    if (payload.startsWith('simple_')) {
-      const moduleName = payload.replace('simple_', '');
+    if (payload.startsWith('simple_roles_') || payload.startsWith('simple_staff_') || payload.startsWith('simple_')) {
+      const isStaffType = payload.startsWith('simple_staff_');
+      const isRolesType = payload.startsWith('simple_roles_');
+      
+      let moduleName;
+      if (isStaffType) moduleName = payload.replace('simple_staff_', '');
+      else if (isRolesType) moduleName = payload.replace('simple_roles_', '');
+      else moduleName = payload.replace('simple_', '');
       
       let existingRoles = [];
       if (moduleName === 'venda') {
-        existingRoles = getGlobalVendaConfig()?.cargosPermitidosIds || [];
+        existingRoles = isStaffType 
+          ? (getGlobalVendaConfig()?.cargosStaffIds || []) 
+          : (getGlobalVendaConfig()?.cargosPermitidosIds || []);
       } else if (moduleName === 'encomenda') {
-        existingRoles = getGlobalEncomendaConfig()?.cargosPermitidosIds || [];
+        existingRoles = isStaffType 
+          ? (getGlobalEncomendaConfig()?.cargosStaffIds || []) 
+          : (getGlobalEncomendaConfig()?.cargosPermitidosIds || []);
       } else if (moduleName === 'ausencia') {
-        existingRoles = getGlobalAusenciaConfig()?.cargosPermitidosIds || [];
+        existingRoles = isStaffType 
+          ? (getGlobalAusenciaConfig()?.cargosStaffIds || []) 
+          : (getGlobalAusenciaConfig()?.cargosPermitidosIds || []);
       } else if (moduleName === 'recrutamento') {
         existingRoles = getGlobalRecrutamentoConfig()?.cargosStaffIds || [];
       }
@@ -1340,16 +1510,19 @@ export async function handleInteraction(interaction) {
       const rolesIds = tempRoles || existingRoles;
       
       if (moduleName === 'venda') {
-        const config = getGlobalVendaConfig() || { forumCanalId: '', cargosPermitidosIds: [] };
-        config.cargosPermitidosIds = rolesIds;
+        const config = getGlobalVendaConfig() || { forumCanalId: '', cargosPermitidosIds: [], cargosStaffIds: [] };
+        if (isStaffType) config.cargosStaffIds = rolesIds;
+        else config.cargosPermitidosIds = rolesIds;
         saveGlobalVendaConfig(config);
       } else if (moduleName === 'encomenda') {
-        const config = getGlobalEncomendaConfig() || { forumCanalId: '', cargosPermitidosIds: [] };
-        config.cargosPermitidosIds = rolesIds;
+        const config = getGlobalEncomendaConfig() || { forumCanalId: '', cargosPermitidosIds: [], cargosStaffIds: [] };
+        if (isStaffType) config.cargosStaffIds = rolesIds;
+        else config.cargosPermitidosIds = rolesIds;
         saveGlobalEncomendaConfig(config);
       } else if (moduleName === 'ausencia') {
-        const config = getGlobalAusenciaConfig() || { canalId: '', cargosPermitidosIds: [] };
-        config.cargosPermitidosIds = rolesIds;
+        const config = getGlobalAusenciaConfig() || { canalId: '', cargosPermitidosIds: [], cargosStaffIds: [] };
+        if (isStaffType) config.cargosStaffIds = rolesIds;
+        else config.cargosPermitidosIds = rolesIds;
         saveGlobalAusenciaConfig(config);
       } else if (moduleName === 'recrutamento') {
         const config = getGlobalRecrutamentoConfig() || { canalPainelId: '', canalPedidosId: '', canalLogsNegadoId: '', cargosStaffIds: [] };
@@ -1545,7 +1718,10 @@ async function showSimpleModuleMenu(interaction, moduleName) {
     const rolesText = config?.cargosPermitidosIds && config.cargosPermitidosIds.length > 0
       ? config.cargosPermitidosIds.map(id => `<@&${id}>`).join(', ')
       : '❌ *Não Configurado*';
-    statusLines = `• **Fórum de Vendas:** ${forumText}\n• **Cargos Permitidos:** ${rolesText}`;
+    const staffText = config?.cargosStaffIds && config.cargosStaffIds.length > 0
+      ? config.cargosStaffIds.map(id => `<@&${id}>`).join(', ')
+      : '❌ *Não Configurado*';
+    statusLines = `• **Fórum de Vendas:** ${forumText}\n• **Cargos Permitidos (Vender):** ${rolesText}\n• **Cargos Staff (Gerenciar):** ${staffText}`;
   } 
   
   else if (moduleName === 'encomenda') {
@@ -1556,7 +1732,10 @@ async function showSimpleModuleMenu(interaction, moduleName) {
     const rolesText = config?.cargosPermitidosIds && config.cargosPermitidosIds.length > 0
       ? config.cargosPermitidosIds.map(id => `<@&${id}>`).join(', ')
       : '❌ *Não Configurado*';
-    statusLines = `• **Fórum de Encomendas:** ${forumText}\n• **Cargos Permitidos:** ${rolesText}`;
+    const staffText = config?.cargosStaffIds && config.cargosStaffIds.length > 0
+      ? config.cargosStaffIds.map(id => `<@&${id}>`).join(', ')
+      : '❌ *Não Configurado*';
+    statusLines = `• **Fórum de Encomendas:** ${forumText}\n• **Cargos Permitidos (Pedir):** ${rolesText}\n• **Cargos Staff (Gerenciar):** ${staffText}`;
   } 
   
   else if (moduleName === 'ausencia') {
@@ -1567,7 +1746,10 @@ async function showSimpleModuleMenu(interaction, moduleName) {
     const rolesText = config?.cargosPermitidosIds && config.cargosPermitidosIds.length > 0
       ? config.cargosPermitidosIds.map(id => `<@&${id}>`).join(', ')
       : '❌ *Não Configurado*';
-    statusLines = `• **Canal do Painel:** ${chanText}\n• **Cargos Permitidos:** ${rolesText}`;
+    const staffText = config?.cargosStaffIds && config.cargosStaffIds.length > 0
+      ? config.cargosStaffIds.map(id => `<@&${id}>`).join(', ')
+      : '❌ *Não Configurado*';
+    statusLines = `• **Canal do Painel:** ${chanText}\n• **Cargos Permitidos (Ausentar):** ${rolesText}\n• **Cargos Staff (Gerenciar):** ${staffText}`;
   } 
   
   else if (moduleName === 'recrutamento') {
@@ -1598,12 +1780,78 @@ async function showSimpleModuleMenu(interaction, moduleName) {
     .setFooter({ text: `LuxBot ${moduleName.toUpperCase()} • ${dataAtual} • criado por chegaheitor` });
 
   const btnChannels = new ButtonBuilder().setCustomId(`painelconfig_btn_simple_channels_${moduleName}`).setLabel(moduleName === 'recrutamento' ? 'Canais' : 'Canal/Fórum').setStyle(ButtonStyle.Primary).setEmoji('📢');
-  const btnRoles = new ButtonBuilder().setCustomId(`painelconfig_btn_simple_roles_${moduleName}`).setLabel('Cargos').setStyle(ButtonStyle.Primary).setEmoji('👥');
+  
+  let btnRolesLabel = 'Cargos';
+  if (['venda', 'encomenda', 'ausencia'].includes(moduleName)) {
+    btnRolesLabel = 'Cargos Registro';
+  }
+  const btnRoles = new ButtonBuilder().setCustomId(`painelconfig_btn_simple_roles_${moduleName}`).setLabel(btnRolesLabel).setStyle(ButtonStyle.Primary).setEmoji('👥');
   const btnCriar = new ButtonBuilder().setCustomId(`painelconfig_btn_simple_criar_${moduleName}`).setLabel('Criar Painel').setStyle(ButtonStyle.Success).setEmoji('➕');
   const btnLimpar = new ButtonBuilder().setCustomId(`painelconfig_btn_clear_simple_${moduleName}`).setLabel('Limpar Config').setStyle(ButtonStyle.Danger).setEmoji('🗑️');
   const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
 
-  const row = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnCriar, btnLimpar, btnVoltar);
+  let components = [];
+  if (['venda', 'encomenda', 'ausencia'].includes(moduleName)) {
+    const btnStaff = new ButtonBuilder().setCustomId(`painelconfig_btn_simple_staff_${moduleName}`).setLabel('Cargos Staff').setStyle(ButtonStyle.Primary).setEmoji('👮');
+    const row1 = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnStaff);
+    const row2 = new ActionRowBuilder().addComponents(btnCriar, btnLimpar, btnVoltar);
+    components = [row1, row2];
+  } else {
+    const row = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnCriar, btnLimpar, btnVoltar);
+    components = [row];
+  }
+
+  return await interaction.update({ embeds: [embed], components: components });
+}
+
+// Painel de Perfil
+async function showPerfilMenu(interaction) {
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
+  const perfil = getGlobalPerfilConfig();
+
+  const pessoalText = perfil?.cargosPessoalIds && perfil.cargosPessoalIds.length > 0
+    ? perfil.cargosPessoalIds.map(id => `<@&${id}>`).join(', ')
+    : '❌ *Não Configurado*';
+
+  const adminText = perfil?.cargosAdminIds && perfil.cargosAdminIds.length > 0
+    ? perfil.cargosAdminIds.map(id => `<@&${id}>`).join(', ')
+    : '❌ *Não Configurado*';
+
+  const embed = new EmbedBuilder()
+    .setTitle('👤 CONFIGURAÇÃO DE PERFIL 👤')
+    .setDescription(
+      'Configure os cargos autorizados a editar e gerenciar as fichas de perfil do LuxBot:\n\n' +
+      `• **👤 Alteração de Dados Pessoais:** ${pessoalText}\n*(Cargos autorizados a alterar Nome, ID e Telefone)*\n\n` +
+      `• **👮 Alteração Administrativa & Exclusão:** ${adminText}\n*(Cargos autorizados a alterar Cargo, Recrutador, Set e Excluir Perfil)*`
+    )
+    .setColor(3447003)
+    .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` });
+
+  const btnPessoal = new ButtonBuilder()
+    .setCustomId('painelconfig_btn_perfil_roles_pessoal')
+    .setLabel('Cargos Pessoais')
+    .setStyle(ButtonStyle.Primary)
+    .setEmoji('👤');
+
+  const btnAdmin = new ButtonBuilder()
+    .setCustomId('painelconfig_btn_perfil_roles_admin')
+    .setLabel('Cargos Admins')
+    .setStyle(ButtonStyle.Primary)
+    .setEmoji('👮');
+
+  const btnLimpar = new ButtonBuilder()
+    .setCustomId('painelconfig_btn_clear_perfil')
+    .setLabel('Limpar Config')
+    .setStyle(ButtonStyle.Danger)
+    .setEmoji('🗑️');
+
+  const btnVoltar = new ButtonBuilder()
+    .setCustomId('painelconfig_btn_back')
+    .setLabel('Voltar')
+    .setStyle(ButtonStyle.Secondary)
+    .setEmoji('↩️');
+
+  const row = new ActionRowBuilder().addComponents(btnPessoal, btnAdmin, btnLimpar, btnVoltar);
 
   return await interaction.update({ embeds: [embed], components: [row] });
 }

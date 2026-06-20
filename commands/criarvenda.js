@@ -1,14 +1,14 @@
-import { 
-  SlashCommandBuilder, 
-  PermissionFlagsBits, 
-  EmbedBuilder, 
-  ActionRowBuilder, 
-  ButtonBuilder, 
-  ButtonStyle, 
-  ModalBuilder, 
-  TextInputBuilder, 
-  TextInputStyle, 
-  ChannelType 
+import {
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ChannelType
 } from 'discord.js';
 import { getGlobalVendaConfig, addVenda } from '../database.js';
 import { sendLog } from '../logs.js';
@@ -19,6 +19,16 @@ function hasVendaPermission(interaction, config) {
   }
   if (config && config.cargosPermitidosIds && Array.isArray(config.cargosPermitidosIds)) {
     return config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId));
+  }
+  return false;
+}
+
+function hasVendaStaffPermission(interaction, config) {
+  if (interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return true;
+  }
+  if (config && config.cargosStaffIds && Array.isArray(config.cargosStaffIds)) {
+    return config.cargosStaffIds.some(roleId => interaction.member.roles.cache.has(roleId));
   }
   return false;
 }
@@ -55,7 +65,7 @@ export async function criarPainelVenda(client, guild) {
   try {
     const config = getGlobalVendaConfig();
     const dataAtual = new Date().toLocaleDateString('pt-BR');
-    
+
     if (!config || !config.forumCanalId) return false;
 
     const canalForum = guild.channels.cache.get(config.forumCanalId)
@@ -188,7 +198,7 @@ export async function handleInteraction(interaction) {
     } catch (error) {
       console.error('Erro ao abrir modal de vendas:', error);
       await interaction.reply({
-        content: '❌ Ocorreu um erro ao abrir o formul├írio de venda.',
+        content: '❌ Ocorreu um erro ao abrir o formulário de venda.',
         ephemeral: true
       });
     }
@@ -201,7 +211,7 @@ export async function handleInteraction(interaction) {
       const forumId = interaction.channel.parentId;
       if (!forumId) {
         return await interaction.reply({
-          content: '❌ Erro: Não foi poss├¡vel obter o canal do fórum.',
+          content: '❌ Erro: Não foi possível obter o canal do fórum.',
           ephemeral: true
         });
       }
@@ -224,12 +234,12 @@ export async function handleInteraction(interaction) {
         .setTitle('🛍️ NOVA VENDA REGISTRADA 🛍️')
         .setDescription('Mais uma venda realizada com sucesso!')
         .addFields(
-          { name: '­ƒæñ Cliente:', value: cliente, inline: true },
+          { name: '👤 Cliente:', value: cliente, inline: true },
           { name: '🔢 Quantidade:', value: qtd, inline: true },
           { name: '💰 Valor:', value: valor, inline: true },
           { name: '📅 Data da Venda:', value: dataVenda, inline: true },
-          { name: '­ƒñØ Parceria:', value: parceria, inline: true },
-          { name: '­ƒÆ╝ Vendedor:', value: `<@${interaction.user.id}>`, inline: true }
+          { name: '🤝 Parceria:', value: parceria, inline: true },
+          { name: '💼 Vendedor:', value: `<@${interaction.user.id}>`, inline: true }
         )
         .setColor(2326507)
         .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
@@ -251,7 +261,7 @@ export async function handleInteraction(interaction) {
 
       // Criar novo tópico no fórum correspondente
       const newThread = await forumChannel.threads.create({
-        name: `🛍️ÔöâVenda - ${cliente} - ${dataVenda}`,
+        name: `🛍️ Venda - ${cliente} - ${dataVenda}`,
         message: {
           embeds: [saleEmbed],
           components: [rowButtons]
@@ -275,11 +285,11 @@ export async function handleInteraction(interaction) {
         .setColor(3066993)
         .setDescription(`O membro <@${interaction.user.id}> registrou uma nova venda no fórum ${forumChannel}.`)
         .addFields(
-          { name: '­ƒæñ Cliente:', value: cliente, inline: true },
+          { name: '👤 Cliente:', value: cliente, inline: true },
           { name: '🔢 Quantidade:', value: qtd, inline: true },
           { name: '💰 Valor:', value: valor, inline: true },
           { name: '📅 Data:', value: dataVenda, inline: true },
-          { name: '­ƒñØ Parceria:', value: parceria, inline: true }
+          { name: '🤝 Parceria:', value: parceria, inline: true }
         )
         .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
@@ -303,7 +313,7 @@ export async function handleInteraction(interaction) {
       const forumId = interaction.channel.parentId;
 
       const config = getGlobalVendaConfig();
-      const hasPermission = hasVendaPermission(interaction, config);
+      const hasPermission = hasVendaStaffPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
@@ -364,7 +374,7 @@ export async function handleInteraction(interaction) {
       const forumId = interaction.channel.parentId;
 
       const config = getGlobalVendaConfig();
-      const hasPermission = hasVendaPermission(interaction, config);
+      const hasPermission = hasVendaStaffPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
@@ -403,7 +413,7 @@ export async function handleInteraction(interaction) {
       const forumId = interaction.channel.parentId;
 
       const config = getGlobalVendaConfig();
-      const hasPermission = hasVendaPermission(interaction, config);
+      const hasPermission = hasVendaStaffPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
@@ -420,7 +430,7 @@ export async function handleInteraction(interaction) {
 
       // Reverter embed
       const originalEmbed = interaction.message.embeds[0];
-      
+
       // Remover campo "Confirmado por" do embed
       const cleanFields = originalEmbed.fields.filter(f => !f.name.includes('Confirmado por'));
 
