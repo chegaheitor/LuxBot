@@ -75,15 +75,15 @@ export async function criarPainelFarm(client, guild) {
     return false;
   }
 }
-// M├®todo para tratar intera├º├Áes relativas a este comando
+// Método para tratar interações relativas a este comando
 export async function handleInteraction(interaction) {
   const { customId } = interaction;
   const dataAtual = new Date().toLocaleDateString('pt-BR');
 
-  // 1. Tratar bot├Áes
+  // 1. Tratar botões
   if (interaction.isButton()) {
 
-    // Bot├úo de Solicitar Pasta (Membro)
+    // Botão de Solicitar Pasta (Membro)
     if (customId === 'farm_abrir_pasta_btn') {
       try {
         const userId = interaction.user.id;
@@ -96,7 +96,7 @@ export async function handleInteraction(interaction) {
           });
         }
 
-        // A. Verificar se o membro est├í aprovado no sistema de recrutamento
+        // A. Verificar se o membro está aprovado no sistema de recrutamento
         const recrutas = getRecrutas();
         let recruta = recrutas.find(r => r.discordId === userId && r.status === 'ACEITO');
 
@@ -122,7 +122,7 @@ export async function handleInteraction(interaction) {
           });
         }
 
-        // B. Verificar se ele j├í possui uma pasta de farm ativa
+        // B. Verificar se ele já possui uma pasta de farm ativa
         const activeChannel = getActiveFarmChannel(userId);
         if (activeChannel) {
           return await interaction.reply({
@@ -196,7 +196,7 @@ export async function handleInteraction(interaction) {
           cargosAdminIds: config.cargosAdminIds || []
         });
 
-        // Enviar log de cria├º├úo de canal de farm
+        // Enviar log de criação de canal de farm
         const logEmbed = new EmbedBuilder()
           .setTitle('📂 Pasta de Farm Criada')
           .setColor(3066993)
@@ -246,7 +246,7 @@ export async function handleInteraction(interaction) {
       }
     }
 
-    // Bot├úo Adicionar Farm (Membro)
+    // Botão Adicionar Farm (Membro)
     if (customId === 'farm_adicionar_btn') {
       try {
         const materiais = getFarmMaterials();
@@ -275,7 +275,7 @@ export async function handleInteraction(interaction) {
       }
     }
 
-    // Bot├úo Confirmar Farm (Admin)
+    // Botão Confirmar Farm (Admin)
     if (customId.startsWith('farm_confirmar_btn_')) {
       try {
         const parts = customId.replace('farm_confirmar_btn_', '').split('_');
@@ -289,10 +289,10 @@ export async function handleInteraction(interaction) {
         const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
-          return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para confirmar este farm!', ephemeral: true });
+          return await interaction.reply({ content: '❌ Você não tem permissão para confirmar este farm!', ephemeral: true });
         }
 
-        // Salvar farm no banco de dados local do perfil do usu├írio
+        // Salvar farm no banco de dados local do perfil do usuário
         addConfirmedFarm(userId, {
           item: item,
           quantidade: quantidade,
@@ -300,33 +300,33 @@ export async function handleInteraction(interaction) {
           confirmadoPor: interaction.user.id
         });
 
-        // Adicionar rea├º├úo Ô£à na mensagem original
-        await interaction.message.react('Ô£à').catch(() => null);
+        // Adicionar reação ✅ na mensagem original
+        await interaction.message.react('✅').catch(() => null);
 
         // Atualizar embed mostrando status confirmado
         const originalEmbed = interaction.message.embeds[0];
         let updatedEmbed;
         if (originalEmbed) {
           updatedEmbed = EmbedBuilder.from(originalEmbed)
-            .setTitle('Ô£à FARM CONFIRMADO Ô£à')
+            .setTitle('✅ FARM CONFIRMADO ✅')
             .setColor(3066993)
             .setDescription(
               `­ƒæñ **Enviado por:** <@${userId}>\n` +
-              `­ƒôª **Recurso:** ${item}\n` +
-              `­ƒöó **Quantidade:** ${quantidade}\n` +
-              `­ƒôà **Data:** ${dataStr}\n\n` +
-              `Ô£à **Confirmado por:** <@${interaction.user.id}>`
+              `📦 **Recurso:** ${item}\n` +
+              `🔢 **Quantidade:** ${quantidade}\n` +
+              `📅 **Data:** ${dataStr}\n\n` +
+              `✅ **Confirmado por:** <@${interaction.user.id}>`
             );
         } else {
           updatedEmbed = new EmbedBuilder()
-            .setTitle('Ô£à FARM CONFIRMADO Ô£à')
+            .setTitle('✅ FARM CONFIRMADO ✅')
             .setColor(3066993)
             .setDescription(
               `­ƒæñ **Enviado por:** <@${userId}>\n` +
-              `­ƒôª **Recurso:** ${item}\n` +
-              `­ƒöó **Quantidade:** ${quantidade}\n` +
-              `­ƒôà **Data:** ${dataStr}\n\n` +
-              `Ô£à **Confirmado por:** <@${interaction.user.id}>`
+              `📦 **Recurso:** ${item}\n` +
+              `🔢 **Quantidade:** ${quantidade}\n` +
+              `📅 **Data:** ${dataStr}\n\n` +
+              `✅ **Confirmado por:** <@${interaction.user.id}>`
             );
         }
 
@@ -334,7 +334,7 @@ export async function handleInteraction(interaction) {
           .setCustomId(`farm_desconfirmar_btn_${userId}_${item}_${quantidade}_${dataStr}`)
           .setLabel('Desconfirmar Farm')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji('Ôå®´©Å');
+          .setEmoji('↩️');
 
         const row = new ActionRowBuilder().addComponents(desconfirmBtn);
 
@@ -344,26 +344,26 @@ export async function handleInteraction(interaction) {
           components: [row]
         });
 
-        // Enviar log de confirma├º├úo de farm
+        // Enviar log de confirmação de farm
         const logEmbed = new EmbedBuilder()
-          .setTitle('Ô£à Farm Confirmado')
+          .setTitle('✅ Farm Confirmado')
           .setColor(3066993)
           .setDescription(`O administrador <@${interaction.user.id}> confirmou o farm de <@${userId}>.`)
           .addFields(
-            { name: '­ƒôª Recurso:', value: item, inline: true },
-            { name: '­ƒöó Quantidade:', value: quantidade, inline: true },
-            { name: '­ƒôà Data:', value: dataStr, inline: true }
+            { name: '📦 Recurso:', value: item, inline: true },
+            { name: '🔢 Quantidade:', value: quantidade, inline: true },
+            { name: '📅 Data:', value: dataStr, inline: true }
           )
           .setTimestamp();
         await sendLog(interaction.client, guild, 'registrofarm', logEmbed);
 
       } catch (error) {
         console.error('Erro ao confirmar farm:', error);
-        await interaction.reply({ content: 'Erro ao processar a confirma├º├úo do farm.', ephemeral: true });
+        await interaction.reply({ content: 'Erro ao processar a confirmação do farm.', ephemeral: true });
       }
     }
 
-    // Bot├úo Desconfirmar Farm (Admin)
+    // Botão Desconfirmar Farm (Admin)
     if (customId.startsWith('farm_desconfirmar_btn_')) {
       try {
         const parts = customId.replace('farm_desconfirmar_btn_', '').split('_');
@@ -377,14 +377,14 @@ export async function handleInteraction(interaction) {
         const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
-          return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para desconfirmar este farm!', ephemeral: true });
+          return await interaction.reply({ content: '❌ Você não tem permissão para desconfirmar este farm!', ephemeral: true });
         }
 
         // Remover do banco
         removeConfirmedFarm(userId, item, quantidade, dataStr);
 
-        // Remover rea├º├úo Ô£à
-        const reaction = interaction.message.reactions.cache.get('Ô£à');
+        // Remover reação ✅
+        const reaction = interaction.message.reactions.cache.get('✅');
         if (reaction) {
           await reaction.users.remove(interaction.client.user.id).catch(() => null);
         }
@@ -394,34 +394,34 @@ export async function handleInteraction(interaction) {
         let updatedEmbed;
         if (originalEmbed) {
           updatedEmbed = EmbedBuilder.from(originalEmbed)
-            .setTitle('­ƒî¥ NOVO FARM DECLARADO ­ƒî¥')
+            .setTitle('🌾 NOVO FARM DECLARADO 🌾')
             .setColor(2326507)
             .setDescription(
               `­ƒæñ **Enviado por:** <@${userId}>\n` +
-              `­ƒôª **Recurso:** ${item}\n` +
-              `­ƒöó **Quantidade:** ${quantidade}\n` +
-              `­ƒôà **Data:** ${dataStr}\n\n` +
-              `Aguardando confirma├º├úo de um administrador.`
+              `📦 **Recurso:** ${item}\n` +
+              `🔢 **Quantidade:** ${quantidade}\n` +
+              `📅 **Data:** ${dataStr}\n\n` +
+              `Aguardando confirmação de um administrador.`
             );
         } else {
           updatedEmbed = new EmbedBuilder()
-            .setTitle('­ƒî¥ NOVO FARM DECLARADO ­ƒî¥')
+            .setTitle('🌾 NOVO FARM DECLARADO 🌾')
             .setColor(2326507)
             .setDescription(
               `­ƒæñ **Enviado por:** <@${userId}>\n` +
-              `­ƒôª **Recurso:** ${item}\n` +
-              `­ƒöó **Quantidade:** ${quantidade}\n` +
-              `­ƒôà **Data:** ${dataStr}\n\n` +
-              `Aguardando confirma├º├úo de um administrador.`
+              `📦 **Recurso:** ${item}\n` +
+              `🔢 **Quantidade:** ${quantidade}\n` +
+              `📅 **Data:** ${dataStr}\n\n` +
+              `Aguardando confirmação de um administrador.`
             );
         }
 
-        // Reverter bot├úo
+        // Reverter botão
         const confirmBtn = new ButtonBuilder()
           .setCustomId(`farm_confirmar_btn_${userId}_${item}_${quantidade}_${dataStr}`)
           .setLabel('Confirmar Farm')
           .setStyle(ButtonStyle.Success)
-          .setEmoji('Ô£ö´©Å');
+          .setEmoji('✔️');
 
         const row = new ActionRowBuilder().addComponents(confirmBtn);
 
@@ -431,15 +431,15 @@ export async function handleInteraction(interaction) {
           components: [row]
         });
 
-        // Enviar log de desconfirma├º├úo de farm
+        // Enviar log de desconfirmação de farm
         const logEmbed = new EmbedBuilder()
-          .setTitle('Ôå®´©Å Farm Desconfirmado')
+          .setTitle('↩️ Farm Desconfirmado')
           .setColor(3447003)
           .setDescription(`O administrador <@${interaction.user.id}> desconfirmou o farm de <@${userId}>.`)
           .addFields(
-            { name: '­ƒôª Recurso:', value: item, inline: true },
-            { name: '­ƒöó Quantidade:', value: quantidade, inline: true },
-            { name: '­ƒôà Data:', value: dataStr, inline: true }
+            { name: '📦 Recurso:', value: item, inline: true },
+            { name: '🔢 Quantidade:', value: quantidade, inline: true },
+            { name: '📅 Data:', value: dataStr, inline: true }
           )
           .setTimestamp();
         await sendLog(interaction.client, guild, 'registrofarm', logEmbed);
@@ -450,16 +450,16 @@ export async function handleInteraction(interaction) {
       }
     }
 
-    // Bot├úo Apagar Farm (sem necessidade de permiss├úo administrativa)
+    // Botão Apagar Farm (sem necessidade de permissão administrativa)
     if (customId === 'farm_apagar_declaracao_btn') {
       try {
         const originalEmbed = interaction.message.embeds[0];
-        let desc = 'Uma declara├º├úo de farm pendente foi exclu├¡da.';
+        let desc = 'Uma declaração de farm pendente foi excluída.';
         if (originalEmbed && originalEmbed.description) {
-          desc = `Uma declara├º├úo de farm pendente foi exclu├¡da por <@${interaction.user.id}>:\n${originalEmbed.description}`;
+          desc = `Uma declaração de farm pendente foi excluída por <@${interaction.user.id}>:\n${originalEmbed.description}`;
         }
         const logEmbed = new EmbedBuilder()
-          .setTitle('­ƒùæ´©Å Declara├º├úo de Farm Apagada')
+          .setTitle('🗑️ Declaração de Farm Apagada')
           .setColor(15158332)
           .setDescription(desc)
           .setTimestamp();
@@ -467,17 +467,17 @@ export async function handleInteraction(interaction) {
 
         await interaction.message.delete().catch(() => null);
       } catch (error) {
-        console.error('Erro ao apagar declara├º├úo de farm:', error);
+        console.error('Erro ao apagar declaração de farm:', error);
       }
       return;
     }
 
-    // Bot├úo Bati a Meta (Membro) - Abre select de material
+    // Botão Bati a Meta (Membro) - Abre select de material
     if (customId === 'farm_bati_meta_btn') {
       try {
         const channelConfig = getFarmChannel(interaction.channelId);
         if (!channelConfig) {
-          return await interaction.reply({ content: 'Erro: Canal n├úo registrado no sistema.', ephemeral: true });
+          return await interaction.reply({ content: 'Erro: Canal não registrado no sistema.', ephemeral: true });
         }
 
         const materiais = getFarmMaterials();
@@ -505,8 +505,8 @@ export async function handleInteraction(interaction) {
       }
     }
 
-    // Bot├úo PAGAR META (Admin)
-    // Bot├úo PAGAR META (Admin) - Abre Modal
+    // Botão PAGAR META (Admin)
+    // Botão PAGAR META (Admin) - Abre Modal
     if (customId.startsWith('farm_pagar_meta_btn_')) {
       try {
         const donoId = customId.replace('farm_pagar_meta_btn_', '');
@@ -516,12 +516,12 @@ export async function handleInteraction(interaction) {
         const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
-          return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para gerenciar esta meta!', ephemeral: true });
+          return await interaction.reply({ content: '❌ Você não tem permissão para gerenciar esta meta!', ephemeral: true });
         }
 
         const modal = new ModalBuilder()
           .setCustomId(`farm_pagar_meta_modal_${donoId}`)
-          .setTitle('­ƒÆ© Confirmar Pagamento ­ƒÆ©');
+          .setTitle('💩 Confirmar Pagamento 💩');
 
         const valorInput = new TextInputBuilder()
           .setCustomId('valor_input')
@@ -550,11 +550,11 @@ export async function handleInteraction(interaction) {
 
       } catch (error) {
         console.error('Erro ao abrir modal de pagamento de meta:', error);
-        await interaction.reply({ content: 'Erro ao abrir formul├írio de confirma├º├úo de pagamento.', ephemeral: true });
+        await interaction.reply({ content: 'Erro ao abrir formul├írio de confirmação de pagamento.', ephemeral: true });
       }
     }
 
-    // Bot├úo Desconfirmar Meta (Admin)
+    // Botão Desconfirmar Meta (Admin)
     if (customId.startsWith('farm_desconfirmar_meta_btn_')) {
       try {
         const donoId = customId.replace('farm_desconfirmar_meta_btn_', '');
@@ -564,14 +564,14 @@ export async function handleInteraction(interaction) {
         const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
-          return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para desconfirmar esta meta!', ephemeral: true });
+          return await interaction.reply({ content: '❌ Você não tem permissão para desconfirmar esta meta!', ephemeral: true });
         }
 
         // Remover do banco
         removePaidMeta(donoId);
 
-        // Remover rea├º├úo ­ƒÆ© (ou ­ƒÆ▓ caso o usu├írio clique em uma antiga)
-        const reaction = interaction.message.reactions.cache.find(r => r.emoji.name === '­ƒÆ©' || r.emoji.name === '­ƒÆ▓');
+        // Remover reação 💩 (ou ­ƒÆ▓ caso o usuário clique em uma antiga)
+        const reaction = interaction.message.reactions.cache.find(r => r.emoji.name === '💩' || r.emoji.name === '­ƒÆ▓');
         if (reaction) {
           await reaction.users.remove(interaction.client.user.id).catch(() => null);
         }
@@ -580,43 +580,43 @@ export async function handleInteraction(interaction) {
         const originalEmbed = interaction.message.embeds[0];
         let timestamp = '';
         if (originalEmbed && originalEmbed.description) {
-          const match = originalEmbed.description.match(/­ƒôà \*\*Data da Meta:\*\* ([^\n]+)/);
+          const match = originalEmbed.description.match(/📅 \*\*Data da Meta:\*\* ([^\n]+)/);
           if (match) {
             timestamp = match[1];
           }
         }
         if (!timestamp) {
           const msgDate = interaction.message.createdAt || new Date();
-          timestamp = msgDate.toLocaleDateString('pt-BR') + ' ├ás ' + msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          timestamp = msgDate.toLocaleDateString('pt-BR') + ' às ' + msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
         }
 
         const revertedEmbed = new EmbedBuilder()
-          .setTitle('Ô£¿ META BATIDA Ô£¿')
+          .setTitle('✨ META BATIDA ✨')
           .setDescription(
             `­ƒæñ **Membro:** <@${donoId}>\n` +
-            `­ƒôà **Data/Hora:** ${timestamp}\n\n` +
-            `Aguardando a confirma├º├úo do pagamento pelos administradores.`
+            `📅 **Data/Hora:** ${timestamp}\n\n` +
+            `Aguardando a confirmação do pagamento pelos administradores.`
           )
           .setColor(3066993)
-          .setFooter({ text: `LuxBot Farm ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` });
+          .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
 
         const btnPagar = new ButtonBuilder()
           .setCustomId(`farm_pagar_meta_btn_${donoId}`)
           .setLabel('Pagar Meta')
           .setStyle(ButtonStyle.Success)
-          .setEmoji('­ƒÆ©');
+          .setEmoji('💩');
 
         const btnIncompleta = new ButtonBuilder()
           .setCustomId(`farm_meta_incompleta_btn_${donoId}`)
           .setLabel('Meta Incompleta')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji('ÔÜá´©Å');
+          .setEmoji('⚠️');
 
         const btnExcluir = new ButtonBuilder()
           .setCustomId('farm_excluir_meta_btn')
           .setLabel('Excluir Meta')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji('­ƒùæ´©Å');
+          .setEmoji('🗑️');
 
         const row = new ActionRowBuilder().addComponents(btnPagar, btnIncompleta, btnExcluir);
 
@@ -626,9 +626,9 @@ export async function handleInteraction(interaction) {
           components: [row]
         });
 
-        // Enviar log de desconfirma├º├úo de meta
+        // Enviar log de desconfirmação de meta
         const logEmbed = new EmbedBuilder()
-          .setTitle('Ôå®´©Å Pagamento de Meta Desconfirmado')
+          .setTitle('↩️ Pagamento de Meta Desconfirmado')
           .setColor(3447003)
           .setDescription(`O administrador <@${interaction.user.id}> desconfirmou o pagamento de meta de <@${donoId}>.`)
           .setTimestamp();
@@ -640,7 +640,7 @@ export async function handleInteraction(interaction) {
       }
     }
 
-    // Bot├úo Voltar a Pendente (Admin)
+    // Botão Voltar a Pendente (Admin)
     if (customId.startsWith('farm_voltar_pendente_meta_btn_')) {
       try {
         const donoId = customId.replace('farm_voltar_pendente_meta_btn_', '');
@@ -650,20 +650,20 @@ export async function handleInteraction(interaction) {
         const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
-          return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para redefinir esta meta!', ephemeral: true });
+          return await interaction.reply({ content: '❌ Você não tem permissão para redefinir esta meta!', ephemeral: true });
         }
 
         const originalEmbed = interaction.message.embeds[0];
         let description = '';
         if (originalEmbed && originalEmbed.description) {
-          const parts = originalEmbed.description.split('\n\nÔØî');
-          description = parts[0] + '\n\nAguardando a confirma├º├úo do pagamento pelos administradores.';
+          const parts = originalEmbed.description.split('\n\n❌');
+          description = parts[0] + '\n\nAguardando a confirmação do pagamento pelos administradores.';
         } else {
-          description = 'Aguardando a confirma├º├úo do pagamento pelos administradores.';
+          description = 'Aguardando a confirmação do pagamento pelos administradores.';
         }
 
         const revertedEmbed = EmbedBuilder.from(originalEmbed)
-          .setTitle('Ô£¿ META BATIDA Ô£¿')
+          .setTitle('✨ META BATIDA ✨')
           .setColor(3066993)
           .setDescription(description);
 
@@ -671,19 +671,19 @@ export async function handleInteraction(interaction) {
           .setCustomId(`farm_pagar_meta_btn_${donoId}`)
           .setLabel('Pagar Meta')
           .setStyle(ButtonStyle.Success)
-          .setEmoji('­ƒÆ©');
+          .setEmoji('💩');
 
         const btnIncompleta = new ButtonBuilder()
           .setCustomId(`farm_meta_incompleta_btn_${donoId}`)
           .setLabel('Meta Incompleta')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji('ÔÜá´©Å');
+          .setEmoji('⚠️');
 
         const btnExcluir = new ButtonBuilder()
           .setCustomId('farm_excluir_meta_btn')
           .setLabel('Excluir Meta')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji('­ƒùæ´©Å');
+          .setEmoji('🗑️');
 
         const row = new ActionRowBuilder().addComponents(btnPagar, btnIncompleta, btnExcluir);
 
@@ -695,7 +695,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de meta restaurada
         const logEmbed = new EmbedBuilder()
-          .setTitle('Ôå®´©Å Meta Restaurada para Pendente')
+          .setTitle('↩️ Meta Restaurada para Pendente')
           .setColor(3447003)
           .setDescription(`O administrador <@${interaction.user.id}> restaurou o status da meta de <@${donoId}> para pendente.`)
           .setTimestamp();
@@ -707,16 +707,16 @@ export async function handleInteraction(interaction) {
       }
     }
 
-    // Bot├úo Excluir Meta (Qualquer um com acesso)
+    // Botão Excluir Meta (Qualquer um com acesso)
     if (customId === 'farm_excluir_meta_btn') {
       try {
         const originalEmbed = interaction.message.embeds[0];
-        let desc = 'Uma declara├º├úo de meta batida foi exclu├¡da.';
+        let desc = 'Uma declaração de meta batida foi excluída.';
         if (originalEmbed && originalEmbed.description) {
-          desc = `Uma declara├º├úo de meta batida foi exclu├¡da por <@${interaction.user.id}>:\n${originalEmbed.description}`;
+          desc = `Uma declaração de meta batida foi excluída por <@${interaction.user.id}>:\n${originalEmbed.description}`;
         }
         const logEmbed = new EmbedBuilder()
-          .setTitle('­ƒùæ´©Å Declara├º├úo de Meta Exclu├¡da')
+          .setTitle('🗑️ Declaração de Meta Exclu├¡da')
           .setColor(15158332)
           .setDescription(desc)
           .setTimestamp();
@@ -729,7 +729,7 @@ export async function handleInteraction(interaction) {
       return;
     }
 
-    // Bot├úo Meta Incompleta (Admin)
+    // Botão Meta Incompleta (Admin)
     if (customId.startsWith('farm_meta_incompleta_btn_')) {
       try {
         const donoId = customId.replace('farm_meta_incompleta_btn_', '');
@@ -739,19 +739,19 @@ export async function handleInteraction(interaction) {
         const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
-          return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para gerenciar esta meta!', ephemeral: true });
+          return await interaction.reply({ content: '❌ Você não tem permissão para gerenciar esta meta!', ephemeral: true });
         }
 
         // Abre modal para escrever o motivo
         const modal = new ModalBuilder()
           .setCustomId(`farm_meta_incompleta_modal_${donoId}`)
-          .setTitle('ÔÜá´©Å Meta Incompleta ÔÜá´©Å');
+          .setTitle('⚠️ Meta Incompleta ⚠️');
 
         const motivoInput = new TextInputBuilder()
           .setCustomId('motivo_input')
           .setLabel('MOTIVO DO ERRO')
           .setStyle(TextInputStyle.Paragraph)
-          .setPlaceholder('Explique o que est├í errado com a meta do farm...')
+          .setPlaceholder('Explique o que está errado com a meta do farm...')
           .setRequired(true);
 
         modal.addComponents(new ActionRowBuilder().addComponents(motivoInput));
@@ -762,7 +762,7 @@ export async function handleInteraction(interaction) {
       }
     }
 
-    // Bot├úo Apagar Pasta de Farm (Admin)
+    // Botão Apagar Pasta de Farm (Admin)
     if (customId === 'farm_apagar_pasta_btn') {
       try {
         // Verificar permissão
@@ -770,30 +770,30 @@ export async function handleInteraction(interaction) {
         const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
-          return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para apagar esta pasta!', ephemeral: true });
+          return await interaction.reply({ content: '❌ Você não tem permissão para apagar esta pasta!', ephemeral: true });
         }
 
-        // Envia mensagem de confirma├º├úo apenas para quem clicou (ephemeral)
+        // Envia mensagem de confirmação apenas para quem clicou (ephemeral)
         const confirmBtn = new ButtonBuilder()
           .setCustomId('farm_confirmar_apagar_btn')
           .setLabel('Confirmar Exclus├úo da Pasta')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji('­ƒùæ´©Å');
+          .setEmoji('🗑️');
 
         const row = new ActionRowBuilder().addComponents(confirmBtn);
 
         await interaction.reply({
-          content: 'ÔÜá´©Å **ATEN├ç├âO:** Voc├¬ tem certeza de que deseja apagar esta pasta de farm? Todos os registros do canal ser├úo exclu├¡dos.',
+          content: '⚠️ **ATEN├ç├âO:** Você tem certeza de que deseja apagar esta pasta de farm? Todos os registros do canal ser├úo excluídos.',
           components: [row],
           ephemeral: true
         });
       } catch (error) {
         console.error('Erro ao clicar em Apagar Pasta:', error);
-        await interaction.reply({ content: 'Erro ao abrir confirma├º├úo de exclus├úo.', ephemeral: true });
+        await interaction.reply({ content: 'Erro ao abrir confirmação de exclus├úo.', ephemeral: true });
       }
     }
 
-    // Bot├úo Confirmar Apagar Canal (Admin)
+    // Botão Confirmar Apagar Canal (Admin)
     if (customId === 'farm_confirmar_apagar_btn') {
       try {
         // Verificar permissão
@@ -801,13 +801,13 @@ export async function handleInteraction(interaction) {
         const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
-          return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para executar esta a├º├úo!', ephemeral: true });
+          return await interaction.reply({ content: '❌ Você não tem permissão para executar esta ação!', ephemeral: true });
         }
 
         // Enviar log antes de deletar o canal
         const donoMencao = channelConfig ? `<@${channelConfig.donoId}>` : 'Desconhecido';
         const logEmbed = new EmbedBuilder()
-          .setTitle('­ƒùæ´©Å Pasta de Farm Exclu├¡da')
+          .setTitle('🗑️ Pasta de Farm Exclu├¡da')
           .setColor(15158332)
           .setDescription(`O administrador <@${interaction.user.id}> excluiu a pasta de farm de ${donoMencao}.`)
           .addFields({ name: '­ƒôü Canal Exclu├¡do:', value: `${interaction.channel.name} (${interaction.channelId})` })
@@ -839,13 +839,13 @@ export async function handleInteraction(interaction) {
         const channelConfig = getFarmChannel(interaction.channelId);
 
         if (!channelConfig) {
-          return await interaction.reply({ content: 'Erro: Pasta de farm n├úo configurada no banco.', ephemeral: true });
+          return await interaction.reply({ content: 'Erro: Pasta de farm não configurada no banco.', ephemeral: true });
         }
 
         // Abre modal para quantidade e data
         const modal = new ModalBuilder()
           .setCustomId(`farm_adicionar_modal_${itemSelecionado}`)
-          .setTitle(`­ƒî¥ Adicionar Farm: ${itemSelecionado}`);
+          .setTitle(`🌾 Adicionar Farm: ${itemSelecionado}`);
 
         const qtdInput = new TextInputBuilder()
           .setCustomId('qtd_input')
@@ -883,13 +883,13 @@ export async function handleInteraction(interaction) {
         const channelConfig = getFarmChannel(interaction.channelId);
 
         if (!channelConfig) {
-          return await interaction.reply({ content: 'Erro: Pasta de farm n├úo configurada no banco.', ephemeral: true });
+          return await interaction.reply({ content: 'Erro: Pasta de farm não configurada no banco.', ephemeral: true });
         }
 
         // Abre modal para quantidade e data/hora
         const modal = new ModalBuilder()
           .setCustomId(`farm_bati_meta_modal_${itemSelecionado}`)
-          .setTitle(`Ô£¿ Meta: ${itemSelecionado} Ô£¿`);
+          .setTitle(`✨ Meta: ${itemSelecionado} ✨`);
 
         const qtdInput = new TextInputBuilder()
           .setCustomId('qtd_input')
@@ -899,14 +899,14 @@ export async function handleInteraction(interaction) {
           .setRequired(true);
 
         const now = new Date();
-        const dataFormatada = now.toLocaleDateString('pt-BR') + ' ├ás ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const dataFormatada = now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
         const dataInput = new TextInputBuilder()
           .setCustomId('data_input')
           .setLabel('DATA E HORA')
           .setStyle(TextInputStyle.Short)
           .setValue(dataFormatada)
-          .setPlaceholder('DD/MM/AAAA ├ás HH:MM')
+          .setPlaceholder('DD/MM/AAAA às HH:MM')
           .setRequired(true);
 
         modal.addComponents(
@@ -934,32 +934,32 @@ export async function handleInteraction(interaction) {
 
         const channelConfig = getFarmChannel(interaction.channelId);
         if (!channelConfig) {
-          return await interaction.reply({ content: 'Erro: Canal n├úo cadastrado.', ephemeral: true });
+          return await interaction.reply({ content: 'Erro: Canal não cadastrado.', ephemeral: true });
         }
 
         const embed = new EmbedBuilder()
-          .setTitle('­ƒî¥ NOVO FARM DECLARADO ­ƒî¥')
+          .setTitle('🌾 NOVO FARM DECLARADO 🌾')
           .setDescription(
             `­ƒæñ **Enviado por:** <@${channelConfig.donoId}>\n` +
-            `­ƒôª **Recurso:** ${item}\n` +
-            `­ƒöó **Quantidade:** ${quantidade}\n` +
-            `­ƒôà **Data:** ${dataStr}\n\n` +
-            `Aguardando confirma├º├úo de um administrador.`
+            `📦 **Recurso:** ${item}\n` +
+            `🔢 **Quantidade:** ${quantidade}\n` +
+            `📅 **Data:** ${dataStr}\n\n` +
+            `Aguardando confirmação de um administrador.`
           )
           .setColor(2326507)
-          .setFooter({ text: `LuxBot Farm ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` });
+          .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
 
         const confirmBtn = new ButtonBuilder()
           .setCustomId(`farm_confirmar_btn_${channelConfig.donoId}_${item}_${quantidade}_${dataStr}`)
           .setLabel('Confirmar Farm')
           .setStyle(ButtonStyle.Success)
-          .setEmoji('Ô£ö´©Å');
+          .setEmoji('✔️');
 
         const deleteBtn = new ButtonBuilder()
           .setCustomId('farm_apagar_declaracao_btn')
           .setLabel('Apagar Farm')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji('­ƒùæ´©Å');
+          .setEmoji('🗑️');
 
         const row = new ActionRowBuilder().addComponents(confirmBtn, deleteBtn);
 
@@ -967,23 +967,23 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de farm declarado
         const logEmbed = new EmbedBuilder()
-          .setTitle('­ƒî¥ Novo Farm Declarado')
+          .setTitle('🌾 Novo Farm Declarado')
           .setColor(3447003)
-          .setDescription(`O usu├írio <@${channelConfig.donoId}> declarou um novo farm pendente.`)
+          .setDescription(`O usuário <@${channelConfig.donoId}> declarou um novo farm pendente.`)
           .addFields(
-            { name: '­ƒôª Recurso:', value: item, inline: true },
-            { name: '­ƒöó Quantidade:', value: quantidade, inline: true },
-            { name: '­ƒôà Data:', value: dataStr, inline: true }
+            { name: '📦 Recurso:', value: item, inline: true },
+            { name: '🔢 Quantidade:', value: quantidade, inline: true },
+            { name: '📅 Data:', value: dataStr, inline: true }
           )
           .setTimestamp();
         await sendLog(interaction.client, guild, 'registrofarm', logEmbed);
       } catch (error) {
-        console.error('Erro ao enviar declara├º├úo de farm:', error);
-        await interaction.reply({ content: 'Erro ao registrar declara├º├úo de farm.', ephemeral: true });
+        console.error('Erro ao enviar declaração de farm:', error);
+        await interaction.reply({ content: 'Erro ao registrar declaração de farm.', ephemeral: true });
       }
     }
 
-    // Modal de Declara├º├úo de Meta Batida (Membro)
+    // Modal de Declaração de Meta Batida (Membro)
     if (customId.startsWith('farm_bati_meta_modal_')) {
       try {
         const item = customId.replace('farm_bati_meta_modal_', '');
@@ -992,10 +992,10 @@ export async function handleInteraction(interaction) {
 
         const channelConfig = getFarmChannel(interaction.channelId);
         if (!channelConfig) {
-          return await interaction.reply({ content: 'Erro: Canal n├úo cadastrado.', ephemeral: true });
+          return await interaction.reply({ content: 'Erro: Canal não cadastrado.', ephemeral: true });
         }
 
-        // Salvar meta declarada no banco para estat├¡sticas de perfil
+        // Salvar meta declarada no banco para estatísticas de perfil
         addMetaDeclarada(channelConfig.donoId, interaction.user.tag, {
           item: item,
           quantidade: quantidade,
@@ -1003,34 +1003,34 @@ export async function handleInteraction(interaction) {
         });
 
         const embed = new EmbedBuilder()
-          .setTitle('Ô£¿ META BATIDA Ô£¿')
+          .setTitle('✨ META BATIDA ✨')
           .setDescription(
             `­ƒæñ **Membro:** <@${channelConfig.donoId}>\n` +
-            `­ƒôª **Recurso:** ${item}\n` +
-            `­ƒöó **Quantidade:** ${quantidade}\n` +
-            `­ƒôà **Data/Hora:** ${dataStr}\n\n` +
-            `Aguardando a confirma├º├úo do pagamento pelos administradores.`
+            `📦 **Recurso:** ${item}\n` +
+            `🔢 **Quantidade:** ${quantidade}\n` +
+            `📅 **Data/Hora:** ${dataStr}\n\n` +
+            `Aguardando a confirmação do pagamento pelos administradores.`
           )
           .setColor(3066993)
-          .setFooter({ text: `LuxBot Farm ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` });
+          .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
 
         const btnPagar = new ButtonBuilder()
           .setCustomId(`farm_pagar_meta_btn_${channelConfig.donoId}`)
           .setLabel('Pagar Meta')
           .setStyle(ButtonStyle.Success)
-          .setEmoji('­ƒÆ©');
+          .setEmoji('💩');
 
         const btnIncompleta = new ButtonBuilder()
           .setCustomId(`farm_meta_incompleta_btn_${channelConfig.donoId}`)
           .setLabel('Meta Incompleta')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji('ÔÜá´©Å');
+          .setEmoji('⚠️');
 
         const btnExcluir = new ButtonBuilder()
           .setCustomId('farm_excluir_meta_btn')
           .setLabel('Excluir Meta')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji('­ƒùæ´©Å');
+          .setEmoji('🗑️');
 
         const row = new ActionRowBuilder().addComponents(btnPagar, btnIncompleta, btnExcluir);
 
@@ -1038,19 +1038,19 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de meta batida
         const logEmbed = new EmbedBuilder()
-          .setTitle('Ô£¿ Meta Batida Declarada')
+          .setTitle('✨ Meta Batida Declarada')
           .setColor(3447003)
-          .setDescription(`O usu├írio <@${channelConfig.donoId}> declarou que bateu a meta.`)
+          .setDescription(`O usuário <@${channelConfig.donoId}> declarou que bateu a meta.`)
           .addFields(
-            { name: '­ƒôª Recurso:', value: item, inline: true },
-            { name: '­ƒöó Quantidade:', value: quantidade, inline: true },
-            { name: '­ƒôà Data/Hora:', value: dataStr, inline: true }
+            { name: '📦 Recurso:', value: item, inline: true },
+            { name: '🔢 Quantidade:', value: quantidade, inline: true },
+            { name: '📅 Data/Hora:', value: dataStr, inline: true }
           )
           .setTimestamp();
         await sendLog(interaction.client, guild, 'registrofarm', logEmbed);
       } catch (error) {
-        console.error('Erro ao enviar declara├º├úo de meta batida:', error);
-        await interaction.reply({ content: 'Erro ao registrar declara├º├úo de meta.', ephemeral: true });
+        console.error('Erro ao enviar declaração de meta batida:', error);
+        await interaction.reply({ content: 'Erro ao registrar declaração de meta.', ephemeral: true });
       }
     }
 
@@ -1068,35 +1068,35 @@ export async function handleInteraction(interaction) {
           data: dataStr
         });
 
-        // Reagir com ­ƒÆ© (conforme requisitado para trocar ­ƒÆ▓ por ­ƒÆ©)
-        await interaction.message.react('­ƒÆ©').catch(() => null);
+        // Reagir com 💩 (conforme requisitado para trocar ­ƒÆ▓ por 💩)
+        await interaction.message.react('💩').catch(() => null);
 
         // Obter data da mensagem original
         const msgDate = interaction.message.createdAt || new Date();
-        const dataMensagem = msgDate.toLocaleDateString('pt-BR') + ' ├ás ' + msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const dataMensagem = msgDate.toLocaleDateString('pt-BR') + ' às ' + msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
         const originalEmbed = interaction.message.embeds[0];
         let updatedEmbed;
         if (originalEmbed) {
           updatedEmbed = EmbedBuilder.from(originalEmbed)
-            .setTitle('­ƒÆ© META PAGA ­ƒÆ©')
+            .setTitle('💩 META PAGA 💩')
             .setColor(3066993)
             .setDescription(
               `­ƒæñ **Membro:** <@${donoId}>\n` +
-              `­ƒôà **Data da Meta:** ${dataMensagem}\n` +
-              `­ƒÆ░ **Valor Pago:** ${valor}\n` +
-              `­ƒÆ© **Pago por:** <@${interaction.user.id}>\n` +
+              `📅 **Data da Meta:** ${dataMensagem}\n` +
+              `💰 **Valor Pago:** ${valor}\n` +
+              `💩 **Pago por:** <@${interaction.user.id}>\n` +
               `­ƒôå **Data do Pagamento:** ${dataStr}`
             );
         } else {
           updatedEmbed = new EmbedBuilder()
-            .setTitle('­ƒÆ© META PAGA ­ƒÆ©')
+            .setTitle('💩 META PAGA 💩')
             .setColor(3066993)
             .setDescription(
               `­ƒæñ **Membro:** <@${donoId}>\n` +
-              `­ƒôà **Data da Meta:** ${dataMensagem}\n` +
-              `­ƒÆ░ **Valor Pago:** ${valor}\n` +
-              `­ƒÆ© **Pago por:** <@${interaction.user.id}>\n` +
+              `📅 **Data da Meta:** ${dataMensagem}\n` +
+              `💰 **Valor Pago:** ${valor}\n` +
+              `💩 **Pago por:** <@${interaction.user.id}>\n` +
               `­ƒôå **Data do Pagamento:** ${dataStr}`
             );
         }
@@ -1105,11 +1105,11 @@ export async function handleInteraction(interaction) {
           .setCustomId(`farm_desconfirmar_meta_btn_${donoId}`)
           .setLabel('Desconfirmar Meta')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji('Ôå®´©Å');
+          .setEmoji('↩️');
 
         const row = new ActionRowBuilder().addComponents(desconfirmMetaBtn);
 
-        // Desativar bot├Áes e atualizar a mensagem
+        // Desativar botões e atualizar a mensagem
         await interaction.update({
           content: null,
           embeds: [updatedEmbed],
@@ -1118,12 +1118,12 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de pagamento de meta
         const logEmbed = new EmbedBuilder()
-          .setTitle('­ƒÆ© Meta Confirmada/Paga')
+          .setTitle('💩 Meta Confirmada/Paga')
           .setColor(3066993)
           .setDescription(`O administrador <@${interaction.user.id}> marcou como paga a meta de <@${donoId}>.`)
           .addFields(
-            { name: '­ƒÆ░ Valor Pago:', value: valor, inline: true },
-            { name: '­ƒôà Data do Pagamento:', value: dataStr, inline: true }
+            { name: '💰 Valor Pago:', value: valor, inline: true },
+            { name: '📅 Data do Pagamento:', value: dataStr, inline: true }
           )
           .setTimestamp();
         await sendLog(interaction.client, guild, 'registrofarm', logEmbed);
@@ -1141,29 +1141,29 @@ export async function handleInteraction(interaction) {
         const motivo = interaction.fields.getTextInputValue('motivo_input');
 
         const now = new Date();
-        const timestamp = now.toLocaleDateString('pt-BR') + ' ├ás ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const timestamp = now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
         const originalEmbed = interaction.message.embeds[0];
         let updatedEmbed;
         if (originalEmbed) {
           updatedEmbed = EmbedBuilder.from(originalEmbed)
-            .setTitle('ÔÜá´©Å META INCOMPLETA ÔÜá´©Å')
+            .setTitle('⚠️ META INCOMPLETA ⚠️')
             .setColor(15158332)
             .setDescription(
               originalEmbed.description +
-              `\n\nÔØî **Marcada como Incompleta por:** <@${interaction.user.id}>\n` +
-              `­ƒôØ **Motivo:** *${motivo}*\n` +
-              `­ƒôà **Data/Hora:** ${timestamp}`
+              `\n\n❌ **Marcada como Incompleta por:** <@${interaction.user.id}>\n` +
+              `📝 **Motivo:** *${motivo}*\n` +
+              `📅 **Data/Hora:** ${timestamp}`
             );
         } else {
           updatedEmbed = new EmbedBuilder()
-            .setTitle('ÔÜá´©Å META INCOMPLETA ÔÜá´©Å')
+            .setTitle('⚠️ META INCOMPLETA ⚠️')
             .setColor(15158332)
             .setDescription(
               `­ƒæñ **Membro:** <@${donoId}>\n` +
-              `ÔØî **Marcada como Incompleta por:** <@${interaction.user.id}>\n` +
-              `­ƒôØ **Motivo:** *${motivo}*\n` +
-              `­ƒôà **Data/Hora:** ${timestamp}`
+              `❌ **Marcada como Incompleta por:** <@${interaction.user.id}>\n` +
+              `📝 **Motivo:** *${motivo}*\n` +
+              `📅 **Data/Hora:** ${timestamp}`
             );
         }
 
@@ -1171,11 +1171,11 @@ export async function handleInteraction(interaction) {
           .setCustomId(`farm_voltar_pendente_meta_btn_${donoId}`)
           .setLabel('Voltar a Pendente')
           .setStyle(ButtonStyle.Primary)
-          .setEmoji('Ôå®´©Å');
+          .setEmoji('↩️');
 
         const row = new ActionRowBuilder().addComponents(voltarBtn);
 
-        // Desativar bot├Áes da mensagem de aprova├º├úo de meta
+        // Desativar botões da mensagem de aprovação de meta
         await interaction.update({
           content: null,
           embeds: [updatedEmbed],
@@ -1184,21 +1184,21 @@ export async function handleInteraction(interaction) {
 
         // Responder ao admin de forma oculta (ephemeral)
         await interaction.followUp({
-          content: `ÔÜá´©Å Meta incompleta! Justificativa enviada.`,
+          content: `⚠️ Meta incompleta! Justificativa enviada.`,
           ephemeral: true
         });
 
-        // Envia notifica├º├úo simples no canal marcando o usu├írio dono da pasta
+        // Envia notificação simples no canal marcando o usuário dono da pasta
         await interaction.channel.send({
-          content: `ÔÜá´©Å <@${donoId}>, sua meta foi marcada como **incompleta/errada** por <@${interaction.user.id}>! Verifique o motivo no painel acima.`
+          content: `⚠️ <@${donoId}>, sua meta foi marcada como **incompleta/errada** por <@${interaction.user.id}>! Verifique o motivo no painel acima.`
         });
 
         // Enviar log de meta incompleta
         const logEmbed = new EmbedBuilder()
-          .setTitle('ÔÜá´©Å Meta Marcada como Incompleta')
+          .setTitle('⚠️ Meta Marcada como Incompleta')
           .setColor(15158332)
           .setDescription(`O administrador <@${interaction.user.id}> marcou a meta de <@${donoId}> como incompleta.`)
-          .addFields({ name: '­ƒôØ Motivo:', value: motivo })
+          .addFields({ name: '📝 Motivo:', value: motivo })
           .setTimestamp();
         await sendLog(interaction.client, guild, 'registrofarm', logEmbed);
       } catch (error) {

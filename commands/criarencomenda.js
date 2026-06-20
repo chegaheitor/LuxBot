@@ -10,7 +10,7 @@ import {
   TextInputStyle, 
   ChannelType 
 } from 'discord.js';
-import { getGlobalEncomendaConfig, addEncomenda, getEncomendaPanel } from '../database.js';
+import { getGlobalEncomendaConfig, addEncomenda } from '../database.js';
 import { sendLog } from '../logs.js';
 
 function hasEncomendaPermission(interaction, config) {
@@ -95,27 +95,27 @@ export async function criarPainelEncomenda(client, guild) {
     return false;
   }
 }
-// Trata as intera├º├Áes de encomenda_
+// Trata as interações de encomenda_
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
   const dataAtual = new Date().toLocaleDateString('pt-BR');
 
-  // 1. Bot├úo Registrar Encomenda clicado
+  // 1. Botão Registrar Encomenda clicado
   if (customId === 'encomenda_nova_btn') {
     try {
       const forumId = interaction.channel.parentId;
       if (!forumId) {
         return await interaction.reply({
-          content: 'ÔØî Erro: Este painel n├úo foi localizado dentro de um canal de f├│rum.',
+          content: '❌ Erro: Este painel não foi localizado dentro de um canal de fórum.',
           ephemeral: true
         });
       }
 
-      const config = getEncomendaPanel(forumId);
+      const config = getGlobalEncomendaConfig();
       if (!config) {
         return await interaction.reply({
-          content: 'ÔØî Erro: Configura├º├úo de encomendas deste f├│rum n├úo localizada no banco de dados.',
+          content: '❌ Erro: Configuração de encomendas não localizada no banco de dados. Configure no `/painelconfig` primeiro.',
           ephemeral: true
         });
       }
@@ -125,7 +125,7 @@ export async function handleInteraction(interaction) {
 
       if (!hasPermission) {
         return await interaction.reply({
-          content: 'ÔØî Voc├¬ n├úo tem o cargo autorizado para registrar encomendas!',
+          content: '❌ Você não tem o cargo autorizado para registrar encomendas!',
           ephemeral: true
         });
       }
@@ -133,7 +133,7 @@ export async function handleInteraction(interaction) {
       // Abrir modal de encomenda (5 campos)
       const modal = new ModalBuilder()
         .setCustomId('encomenda_nova_modal')
-        .setTitle('­ƒôª Registrar Nova Encomenda');
+        .setTitle('📦 Registrar Nova Encomenda');
 
       const clienteInput = new TextInputBuilder()
         .setCustomId('cliente_input')
@@ -165,10 +165,10 @@ export async function handleInteraction(interaction) {
 
       const parceriaInput = new TextInputBuilder()
         .setCustomId('parceria_input')
-        .setLabel('PARCERIA (SIM/N├âO)')
+        .setLabel('PARCERIA (SIM/NÃO)')
         .setStyle(TextInputStyle.Short)
-        .setValue('N├úo')
-        .setPlaceholder('Digite Sim ou N├úo')
+        .setValue('Não')
+        .setPlaceholder('Digite Sim ou Não')
         .setRequired(true);
 
       modal.addComponents(
@@ -184,7 +184,7 @@ export async function handleInteraction(interaction) {
     } catch (error) {
       console.error('Erro ao abrir modal de encomendas:', error);
       await interaction.reply({
-        content: 'ÔØî Ocorreu um erro ao abrir o formul├írio de encomenda.',
+        content: '❌ Ocorreu um erro ao abrir o formul├írio de encomenda.',
         ephemeral: true
       });
     }
@@ -197,7 +197,7 @@ export async function handleInteraction(interaction) {
       const forumId = interaction.channel.parentId;
       if (!forumId) {
         return await interaction.reply({
-          content: 'ÔØî Erro: N├úo foi poss├¡vel obter o canal do f├│rum.',
+          content: '❌ Erro: Não foi poss├¡vel obter o canal do fórum.',
           ephemeral: true
         });
       }
@@ -205,7 +205,7 @@ export async function handleInteraction(interaction) {
       const forumChannel = guild.channels.cache.get(forumId) || await guild.channels.fetch(forumId).catch(() => null);
       if (!forumChannel) {
         return await interaction.reply({
-          content: 'ÔØî Erro: Canal de F├│rum n├úo localizado.',
+          content: '❌ Erro: Canal de Fórum não localizado.',
           ephemeral: true
         });
       }
@@ -217,19 +217,19 @@ export async function handleInteraction(interaction) {
       const parceria = interaction.fields.getTextInputValue('parceria_input').trim();
 
       const orderEmbed = new EmbedBuilder()
-        .setTitle('ÔÅ│ ENCOMENDA PENDENTE ÔÅ│')
-        .setDescription('Nova encomenda registrada e aguardando produ├º├úo.')
+        .setTitle('⏳ ENCOMENDA PENDENTE ⏳')
+        .setDescription('Nova encomenda registrada e aguardando produção.')
         .addFields(
           { name: '­ƒæñ Cliente:', value: cliente, inline: true },
-          { name: '­ƒöó Quantidade:', value: qtd, inline: true },
-          { name: '­ƒÆ░ Valor:', value: valor, inline: true },
-          { name: '­ƒôà Entrega at├®:', value: dataEntrega, inline: true },
+          { name: '🔢 Quantidade:', value: qtd, inline: true },
+          { name: '💰 Valor:', value: valor, inline: true },
+          { name: '📅 Entrega at├®:', value: dataEntrega, inline: true },
           { name: '­ƒñØ Parceria:', value: parceria, inline: true },
           { name: '­ƒÆ╝ Registrado por:', value: `<@${interaction.user.id}>`, inline: true },
-          { name: 'Ôä╣´©Å Status:', value: 'ÔÅ│ Pendente', inline: true }
+          { name: 'ℹ️ Status:', value: '⏳ Pendente', inline: true }
         )
         .setColor(15844367) // Dourado/Amarelo
-        .setFooter({ text: `LuxBot Encomendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       // Bot├Áes do Estado Pendente: Iniciar Produ├º├úo e Excluir Encomenda
@@ -237,75 +237,75 @@ export async function handleInteraction(interaction) {
         .setCustomId(`encomenda_produzir_btn_${interaction.user.id}`)
         .setLabel('Iniciar Produ├º├úo')
         .setStyle(ButtonStyle.Primary)
-        .setEmoji('­ƒøá´©Å');
+        .setEmoji('🏭');
 
       const btnExcluir = new ButtonBuilder()
         .setCustomId('encomenda_excluir_btn')
         .setLabel('Excluir Encomenda')
         .setStyle(ButtonStyle.Danger)
-        .setEmoji('­ƒùæ´©Å');
+        .setEmoji('🗑️');
 
       const rowButtons = new ActionRowBuilder().addComponents(btnProduzir, btnExcluir);
 
-      // Criar novo t├│pico no f├│rum correspondente
+      // Criar novo tópico no fórum correspondente
       const newThread = await forumChannel.threads.create({
-        name: `ÔÅ│ÔöâPendente - ${cliente} - ${dataEntrega}`,
+        name: `⏳ÔöâPendente - ${cliente} - ${dataEntrega}`,
         message: {
           embeds: [orderEmbed],
           components: [rowButtons]
         }
       });
 
-      // Salvar encomenda no banco para estat├¡sticas do /perfil
+      // Salvar encomenda no banco para estatísticas do /perfil
       addEncomenda(interaction.user.id, interaction.user.tag, {
         data: dataEntrega,
         threadUrl: newThread.url
       });
 
       await interaction.reply({
-        content: `Ô£à Encomenda registrada com sucesso! Novo t├│pico criado: ${newThread}`,
+        content: `✅ Encomenda registrada com sucesso! Novo tópico criado: ${newThread}`,
         ephemeral: true
       });
 
       // Enviar log de nova encomenda
       const logEmbed = new EmbedBuilder()
-        .setTitle('­ƒôª ENCOMENDA REGISTRADA ­ƒôª')
+        .setTitle('📦 ENCOMENDA REGISTRADA 📦')
         .setColor(15844367)
-        .setDescription(`O membro <@${interaction.user.id}> registrou uma nova encomenda no f├│rum ${forumChannel}.`)
+        .setDescription(`O membro <@${interaction.user.id}> registrou uma nova encomenda no fórum ${forumChannel}.`)
         .addFields(
           { name: '­ƒæñ Cliente:', value: cliente, inline: true },
-          { name: '­ƒöó Quantidade:', value: qtd, inline: true },
-          { name: '­ƒÆ░ Valor:', value: valor, inline: true },
-          { name: '­ƒôà Entrega:', value: dataEntrega, inline: true },
+          { name: '🔢 Quantidade:', value: qtd, inline: true },
+          { name: '💰 Valor:', value: valor, inline: true },
+          { name: '📅 Entrega:', value: dataEntrega, inline: true },
           { name: '­ƒñØ Parceria:', value: parceria, inline: true }
         )
-        .setFooter({ text: `LuxBot Encomendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
 
     } catch (error) {
-      console.error('Erro ao processar submiss├úo de modal de encomendas:', error);
+      console.error('Erro ao processar submissão de modal de encomendas:', error);
       await interaction.reply({
-        content: 'ÔØî Ocorreu um erro ao processar o registro da sua encomenda.',
+        content: '❌ Ocorreu um erro ao processar o registro da sua encomenda.',
         ephemeral: true
       });
     }
     return;
   }
 
-  // 3. Bot├úo Iniciar Produ├º├úo clicado (Vai para Estado: Em Produ├º├úo)
+  // 3. Botão Iniciar Produ├º├úo clicado (Vai para Estado: Em Produ├º├úo)
   if (customId.startsWith('encomenda_produzir_btn_')) {
     try {
       const donoId = customId.replace('encomenda_produzir_btn_', '');
       const forumId = interaction.channel.parentId;
 
-      const config = getEncomendaPanel(forumId);
+      const config = getGlobalEncomendaConfig();
       const hasPermission = hasEncomendaPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
-          content: 'ÔØî Voc├¬ n├úo tem permiss├úo para iniciar a produ├º├úo desta encomenda!',
+          content: '❌ Você não tem permissão para iniciar a produção desta encomenda!',
           ephemeral: true
         });
       }
@@ -325,29 +325,29 @@ export async function handleInteraction(interaction) {
       const parceria = getFieldValue('Parceria');
       const vendedorMencao = getFieldValue('Registrado');
 
-      // Limpar rea├º├Áes antigas e reagir com ­ƒøá´©Å
+      // Limpar reações antigas e reagir com 🏭
       await interaction.message.reactions.removeAll().catch(() => null);
-      await interaction.message.react('­ƒøá´©Å').catch(() => null);
+      await interaction.message.react('🏭').catch(() => null);
 
-      // Atualizar nome do t├│pico/canal
-      await interaction.channel.setName(`­ƒøá´©ÅÔöâProdu├º├úo - ${cliente} - ${dataEntrega}`).catch(() => null);
+      // Atualizar nome do tópico/canal
+      await interaction.channel.setName(`🏭ÔöâProdu├º├úo - ${cliente} - ${dataEntrega}`).catch(() => null);
 
-      // Novo embed em produ├º├úo
+      // Novo embed em produção
       const updatedEmbed = new EmbedBuilder()
-        .setTitle('­ƒøá´©Å ENCOMENDA EM PRODU├ç├âO ­ƒøá´©Å')
-        .setDescription('A fabrica├º├úo dos itens solicitados foi iniciada.')
+        .setTitle('🏭 ENCOMENDA EM PRODUÇÃO 🏭')
+        .setDescription('A fabricação dos itens solicitados foi iniciada.')
         .addFields(
           { name: '­ƒæñ Cliente:', value: cliente, inline: true },
-          { name: '­ƒöó Quantidade:', value: qtd, inline: true },
-          { name: '­ƒÆ░ Valor:', value: valor, inline: true },
-          { name: '­ƒôà Entrega at├®:', value: dataEntrega, inline: true },
+          { name: '🔢 Quantidade:', value: qtd, inline: true },
+          { name: '💰 Valor:', value: valor, inline: true },
+          { name: '📅 Entrega at├®:', value: dataEntrega, inline: true },
           { name: '­ƒñØ Parceria:', value: parceria, inline: true },
           { name: '­ƒÆ╝ Registrado por:', value: vendedorMencao, inline: true },
-          { name: '­ƒøá´©Å Produ├º├úo por:', value: `<@${interaction.user.id}>`, inline: true },
-          { name: 'Ôä╣´©Å Status:', value: '­ƒøá´©Å Em Produ├º├úo', inline: true }
+          { name: '🏭 Produ├º├úo por:', value: `<@${interaction.user.id}>`, inline: true },
+          { name: 'ℹ️ Status:', value: '🏭 Em Produ├º├úo', inline: true }
         )
         .setColor(3447003) // Azul
-        .setFooter({ text: `LuxBot Encomendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       // Bot├Áes do Estado Em Produ├º├úo: Entregar Encomenda, Voltar a Pendente e Excluir Encomenda
@@ -355,19 +355,19 @@ export async function handleInteraction(interaction) {
         .setCustomId(`encomenda_entregar_btn_${donoId}`)
         .setLabel('Entregar Encomenda')
         .setStyle(ButtonStyle.Success)
-        .setEmoji('Ô£à');
+        .setEmoji('✅');
 
       const btnVoltar = new ButtonBuilder()
         .setCustomId(`encomenda_pendente_btn_${donoId}`)
         .setLabel('Voltar a Pendente')
         .setStyle(ButtonStyle.Secondary)
-        .setEmoji('ÔÅ│');
+        .setEmoji('⏳');
 
       const btnExcluir = new ButtonBuilder()
         .setCustomId('encomenda_excluir_btn')
         .setLabel('Excluir Encomenda')
         .setStyle(ButtonStyle.Danger)
-        .setEmoji('­ƒùæ´©Å');
+        .setEmoji('🗑️');
 
       const rowButtons = new ActionRowBuilder().addComponents(btnEntregar, btnVoltar, btnExcluir);
 
@@ -376,47 +376,47 @@ export async function handleInteraction(interaction) {
         components: [rowButtons]
       });
 
-      // Enviar log de produ├º├úo
+      // Enviar log de produção
       const logEmbed = new EmbedBuilder()
-        .setTitle('­ƒøá´©Å ENCOMENDA EM PRODU├ç├âO ­ƒøá´©Å')
+        .setTitle('🏭 ENCOMENDA EM PRODUÇÃO 🏭')
         .setColor(3447003)
-        .setDescription(`O membro <@${interaction.user.id}> iniciou a produ├º├úo da encomenda de ${cliente} no f├│rum <#${forumId}>.`)
-        .setFooter({ text: `LuxBot Encomendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
+        .setDescription(`O membro <@${interaction.user.id}> iniciou a produção da encomenda de ${cliente} no fórum <#${forumId}>.`)
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
 
     } catch (error) {
-      console.error('Erro ao iniciar produ├º├úo de encomenda:', error);
-      await interaction.reply({ content: 'ÔØî Erro ao iniciar produ├º├úo da encomenda.', ephemeral: true }).catch(() => null);
+      console.error('Erro ao iniciar produção de encomenda:', error);
+      await interaction.reply({ content: '❌ Erro ao iniciar produção da encomenda.', ephemeral: true }).catch(() => null);
     }
     return;
   }
 
-  // 4. Bot├úo Entregar Encomenda clicado (Vai para Estado: Entregue)
+  // 4. Botão Entregar Encomenda clicado (Vai para Estado: Entregue)
   if (customId.startsWith('encomenda_entregar_btn_')) {
     try {
       const donoId = customId.replace('encomenda_entregar_btn_', '');
       const forumId = interaction.channel.parentId;
 
-      const config = getEncomendaPanel(forumId);
+      const config = getGlobalEncomendaConfig();
       const hasPermission = hasEncomendaPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
-          content: 'ÔØî Voc├¬ n├úo tem permiss├úo para entregar esta encomenda!',
+          content: '❌ Você não tem permissão para entregar esta encomenda!',
           ephemeral: true
         });
       }
 
       const originalEmbed = interaction.message.embeds[0];
       const statusField = originalEmbed.fields.find(f => f.name.toLowerCase().includes('status'));
-      const isProducing = originalEmbed.title.toLowerCase().includes('produ├º├úo') 
-        || (statusField && statusField.value.toLowerCase().includes('produ├º├úo'));
+      const isProducing = originalEmbed.title.toLowerCase().includes('produção') 
+        || (statusField && statusField.value.toLowerCase().includes('produção'));
 
       if (!isProducing) {
         return await interaction.reply({
-          content: 'ÔØî Esta encomenda precisa ser iniciada em produ├º├úo antes de poder ser entregue!',
+          content: '❌ Esta encomenda precisa ser iniciada em produção antes de poder ser entregue!',
           ephemeral: true
         });
       }
@@ -435,30 +435,30 @@ export async function handleInteraction(interaction) {
       const vendedorMencao = getFieldValue('Registrado');
       const produtorMencao = getFieldValue('Produ├º├úo por');
 
-      // Limpar rea├º├Áes antigas e reagir com Ô£à
+      // Limpar reações antigas e reagir com ✅
       await interaction.message.reactions.removeAll().catch(() => null);
-      await interaction.message.react('Ô£à').catch(() => null);
+      await interaction.message.react('✅').catch(() => null);
 
-      // Atualizar nome do t├│pico/canal
-      await interaction.channel.setName(`Ô£àÔöâEntregue - ${cliente} - ${dataEntrega}`).catch(() => null);
+      // Atualizar nome do tópico/canal
+      await interaction.channel.setName(`✅ÔöâEntregue - ${cliente} - ${dataEntrega}`).catch(() => null);
 
       // Novo embed entregue
       const updatedEmbed = new EmbedBuilder()
-        .setTitle('Ô£à ENCOMENDA ENTREGUE Ô£à')
+        .setTitle('✅ ENCOMENDA ENTREGUE ✅')
         .setDescription('Encomenda entregue ao cliente e finalizada.')
         .addFields(
           { name: '­ƒæñ Cliente:', value: cliente, inline: true },
-          { name: '­ƒöó Quantidade:', value: qtd, inline: true },
-          { name: '­ƒÆ░ Valor:', value: valor, inline: true },
-          { name: '­ƒôà Entrega at├®:', value: dataEntrega, inline: true },
+          { name: '🔢 Quantidade:', value: qtd, inline: true },
+          { name: '💰 Valor:', value: valor, inline: true },
+          { name: '📅 Entrega at├®:', value: dataEntrega, inline: true },
           { name: '­ƒñØ Parceria:', value: parceria, inline: true },
           { name: '­ƒÆ╝ Registrado por:', value: vendedorMencao, inline: true },
-          { name: '­ƒøá´©Å Produzido por:', value: produtorMencao, inline: true },
+          { name: '🏭 Produzido por:', value: produtorMencao, inline: true },
           { name: '­ƒÄü Entregue por:', value: `<@${interaction.user.id}>`, inline: true },
-          { name: 'Ôä╣´©Å Status:', value: 'Ô£à Entregue', inline: true }
+          { name: 'ℹ️ Status:', value: '✅ Entregue', inline: true }
         )
         .setColor(3066993) // Verde
-        .setFooter({ text: `LuxBot Encomendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       // Bot├Áes do Estado Entregue: Voltar a Pendente e Excluir Encomenda
@@ -466,13 +466,13 @@ export async function handleInteraction(interaction) {
         .setCustomId(`encomenda_pendente_btn_${donoId}`)
         .setLabel('Voltar a Pendente')
         .setStyle(ButtonStyle.Secondary)
-        .setEmoji('ÔÅ│');
+        .setEmoji('⏳');
 
       const btnExcluir = new ButtonBuilder()
         .setCustomId('encomenda_excluir_btn')
         .setLabel('Excluir Encomenda')
         .setStyle(ButtonStyle.Danger)
-        .setEmoji('­ƒùæ´©Å');
+        .setEmoji('🗑️');
 
       const rowButtons = new ActionRowBuilder().addComponents(btnVoltar, btnExcluir);
 
@@ -483,33 +483,33 @@ export async function handleInteraction(interaction) {
 
       // Enviar log de entrega
       const logEmbed = new EmbedBuilder()
-        .setTitle('Ô£à ENCOMENDA ENTREGUE Ô£à')
+        .setTitle('✅ ENCOMENDA ENTREGUE ✅')
         .setColor(3066993)
-        .setDescription(`O membro <@${interaction.user.id}> marcou a encomenda de ${cliente} como entregue no f├│rum <#${forumId}>.`)
-        .setFooter({ text: `LuxBot Encomendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
+        .setDescription(`O membro <@${interaction.user.id}> marcou a encomenda de ${cliente} como entregue no fórum <#${forumId}>.`)
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
 
     } catch (error) {
       console.error('Erro ao entregar encomenda:', error);
-      await interaction.reply({ content: 'ÔØî Erro ao entregar encomenda.', ephemeral: true }).catch(() => null);
+      await interaction.reply({ content: '❌ Erro ao entregar encomenda.', ephemeral: true }).catch(() => null);
     }
     return;
   }
 
-  // 5. Bot├úo Voltar para Pendente clicado (Reverte para Pendente)
+  // 5. Botão Voltar para Pendente clicado (Reverte para Pendente)
   if (customId.startsWith('encomenda_pendente_btn_')) {
     try {
       const donoId = customId.replace('encomenda_pendente_btn_', '');
       const forumId = interaction.channel.parentId;
 
-      const config = getEncomendaPanel(forumId);
+      const config = getGlobalEncomendaConfig();
       const hasPermission = hasEncomendaPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
-          content: 'ÔØî Voc├¬ n├úo tem permiss├úo para redefinir o status desta encomenda!',
+          content: '❌ Você não tem permissão para redefinir o status desta encomenda!',
           ephemeral: true
         });
       }
@@ -529,27 +529,27 @@ export async function handleInteraction(interaction) {
       const parceria = getFieldValue('Parceria');
       const vendedorMencao = getFieldValue('Registrado');
 
-      // Limpar todas as rea├º├Áes
+      // Limpar todas as reações
       await interaction.message.reactions.removeAll().catch(() => null);
 
-      // Reverter nome do t├│pico/canal
-      await interaction.channel.setName(`ÔÅ│ÔöâPendente - ${cliente} - ${dataEntrega}`).catch(() => null);
+      // Reverter nome do tópico/canal
+      await interaction.channel.setName(`⏳ÔöâPendente - ${cliente} - ${dataEntrega}`).catch(() => null);
 
       // Reverter embed para pendente
       const revertedEmbed = new EmbedBuilder()
-        .setTitle('ÔÅ│ ENCOMENDA PENDENTE ÔÅ│')
+        .setTitle('⏳ ENCOMENDA PENDENTE ⏳')
         .setDescription('Encomenda restaurada ao status pendente.')
         .addFields(
           { name: '­ƒæñ Cliente:', value: cliente, inline: true },
-          { name: '­ƒöó Quantidade:', value: qtd, inline: true },
-          { name: '­ƒÆ░ Valor:', value: valor, inline: true },
-          { name: '­ƒôà Entrega at├®:', value: dataEntrega, inline: true },
+          { name: '🔢 Quantidade:', value: qtd, inline: true },
+          { name: '💰 Valor:', value: valor, inline: true },
+          { name: '📅 Entrega at├®:', value: dataEntrega, inline: true },
           { name: '­ƒñØ Parceria:', value: parceria, inline: true },
           { name: '­ƒÆ╝ Registrado por:', value: vendedorMencao, inline: true },
-          { name: 'Ôä╣´©Å Status:', value: 'ÔÅ│ Pendente', inline: true }
+          { name: 'ℹ️ Status:', value: '⏳ Pendente', inline: true }
         )
         .setColor(15844367) // Dourado
-        .setFooter({ text: `LuxBot Encomendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       // Bot├Áes do Estado Pendente: Iniciar Produ├º├úo e Excluir Encomenda
@@ -557,13 +557,13 @@ export async function handleInteraction(interaction) {
         .setCustomId(`encomenda_produzir_btn_${donoId}`)
         .setLabel('Iniciar Produ├º├úo')
         .setStyle(ButtonStyle.Primary)
-        .setEmoji('­ƒøá´©Å');
+        .setEmoji('🏭');
 
       const btnExcluir = new ButtonBuilder()
         .setCustomId('encomenda_excluir_btn')
         .setLabel('Excluir Encomenda')
         .setStyle(ButtonStyle.Danger)
-        .setEmoji('­ƒùæ´©Å');
+        .setEmoji('🗑️');
 
       const rowButtons = new ActionRowBuilder().addComponents(btnProduzir, btnExcluir);
 
@@ -574,32 +574,32 @@ export async function handleInteraction(interaction) {
 
       // Enviar log de revers├úo
       const logEmbed = new EmbedBuilder()
-        .setTitle('ÔÅ│ ENCOMENDA VOLTOU A PENDENTE ÔÅ│')
+        .setTitle('⏳ ENCOMENDA VOLTOU A PENDENTE ⏳')
         .setColor(15844367)
         .setDescription(`O membro <@${interaction.user.id}> redefiniu o status da encomenda de ${cliente} para pendente.`)
-        .setFooter({ text: `LuxBot Encomendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
 
     } catch (error) {
       console.error('Erro ao reverter encomenda para pendente:', error);
-      await interaction.reply({ content: 'ÔØî Erro ao reverter status da encomenda.', ephemeral: true }).catch(() => null);
+      await interaction.reply({ content: '❌ Erro ao reverter status da encomenda.', ephemeral: true }).catch(() => null);
     }
     return;
   }
 
-  // 6. Bot├úo Excluir Encomenda clicado
+  // 6. Botão Excluir Encomenda clicado
   if (customId === 'encomenda_excluir_btn') {
     try {
       const forumId = interaction.channel.parentId;
 
-      const config = getEncomendaPanel(forumId);
+      const config = getGlobalEncomendaConfig();
       const hasPermission = hasEncomendaPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
-          content: 'ÔØî Voc├¬ n├úo tem permiss├úo para excluir esta encomenda!',
+          content: '❌ Você não tem permissão para excluir esta encomenda!',
           ephemeral: true
         });
       }
@@ -608,21 +608,21 @@ export async function handleInteraction(interaction) {
 
       // Enviar log de exclus├úo
       const logEmbed = new EmbedBuilder()
-        .setTitle('­ƒùæ´©Å ENCOMENDA EXCLU├ìDA ­ƒùæ´©Å')
+        .setTitle('🗑️ ENCOMENDA EXCLUÍDA 🗑️')
         .setColor(15158332)
-        .setDescription(`O administrador <@${interaction.user.id}> excluiu o t├│pico de encomenda **${thread.name}** no f├│rum <#${forumId}>.`)
-        .setFooter({ text: `LuxBot Encomendas ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` })
+        .setDescription(`O administrador <@${interaction.user.id}> excluiu o tópico de encomenda **${thread.name}** no fórum <#${forumId}>.`)
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
 
       // Deletar thread
-      await interaction.reply({ content: 'Excluindo t├│pico de encomenda...', ephemeral: true });
+      await interaction.reply({ content: 'Excluindo tópico de encomenda...', ephemeral: true });
       await thread.delete().catch(() => null);
 
     } catch (error) {
       console.error('Erro ao excluir encomenda:', error);
-      await interaction.reply({ content: 'ÔØî Erro ao excluir encomenda.', ephemeral: true }).catch(() => null);
+      await interaction.reply({ content: '❌ Erro ao excluir encomenda.', ephemeral: true }).catch(() => null);
     }
     return;
   }
