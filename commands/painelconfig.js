@@ -304,16 +304,32 @@ export async function handleInteraction(interaction) {
     }
 
     if (action === 'staff') {
+      const adv = getAdvConfig();
+      const existingRoles = adv?.cargosStaffIds || [];
+
       const select = new RoleSelectMenuBuilder()
         .setCustomId('painelconfig_tempselect_adv_staff')
         .setPlaceholder('Escolha os cargos autorizados a aplicar/remover Adv...')
         .setMinValues(1)
         .setMaxValues(5);
+
+      const btnSave = new ButtonBuilder()
+        .setCustomId(`painelconfig_save_adv_staff_${existingRoles.join('_')}`)
+        .setLabel('Salvar Cargos')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('💾');
       
+      const btnBack = new ButtonBuilder()
+        .setCustomId('painelconfig_btn_back_adv')
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('↩️');
+
       const row = new ActionRowBuilder().addComponents(select);
+      const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
       return await interaction.update({
         content: 'Selecione abaixo os cargos de Staff permitidos a aplicar/revogar advertências:',
-        components: [row, rowBack]
+        components: [row, rowBtns]
       });
     }
 
@@ -334,12 +350,26 @@ export async function handleInteraction(interaction) {
 
   if (interaction.isButton() && customId.startsWith('painelconfig_btn_adv_set_c')) {
     const level = customId.replace('painelconfig_btn_adv_set_c', '');
+    const adv = getAdvConfig();
+    const getRolesForLevel = (val) => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val;
+      return [val];
+    };
+    const existingRoles = getRolesForLevel(adv?.[`cargo${level}Id`]);
+
     const select = new RoleSelectMenuBuilder()
       .setCustomId(`painelconfig_tempselect_adv_cargo${level}`)
       .setPlaceholder(`Selecione os cargos para Adv ${level}...`)
       .setMinValues(1)
       .setMaxValues(5);
     
+    const btnSave = new ButtonBuilder()
+      .setCustomId(`painelconfig_save_adv_cargo${level}_${existingRoles.join('_')}`)
+      .setLabel('Salvar Cargos')
+      .setStyle(ButtonStyle.Success)
+      .setEmoji('💾');
+
     const btnBack = new ButtonBuilder()
       .setCustomId('painelconfig_btn_adv_cargos_adv')
       .setLabel('Voltar')
@@ -347,11 +377,11 @@ export async function handleInteraction(interaction) {
       .setEmoji('↩️');
     
     const row = new ActionRowBuilder().addComponents(select);
-    const rowBack = new ActionRowBuilder().addComponents(btnBack);
+    const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
 
     return await interaction.update({
       content: `Selecione os cargos correspondentes ao acúmulo de **${level} advertência(s)** no servidor:`,
-      components: [row, rowBack]
+      components: [row, rowBtns]
     });
   }
 
@@ -410,16 +440,32 @@ export async function handleInteraction(interaction) {
     }
 
     if (action === 'roles') {
+      const farm = getGlobalFarmConfig();
+      const existingRoles = farm?.cargosAdminIds || [];
+
       const select = new RoleSelectMenuBuilder()
         .setCustomId('painelconfig_tempselect_farm')
         .setPlaceholder('Escolha os cargos autorizados a gerenciar metas e farms...')
         .setMinValues(1)
         .setMaxValues(5);
+
+      const btnSave = new ButtonBuilder()
+        .setCustomId(`painelconfig_save_farm_${existingRoles.join('_')}`)
+        .setLabel('Salvar Cargos')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('💾');
+      
+      const btnBack = new ButtonBuilder()
+        .setCustomId('painelconfig_btn_back_farm')
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('↩️');
       
       const row = new ActionRowBuilder().addComponents(select);
+      const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
       return await interaction.update({
         content: 'Selecione abaixo os cargos autorizados a gerenciar as metas e canais de farm:',
-        components: [row, rowBack]
+        components: [row, rowBtns]
       });
     }
 
@@ -626,6 +672,12 @@ export async function handleInteraction(interaction) {
       .setMinValues(1)
       .setMaxValues(5);
 
+    const btnSave = new ButtonBuilder()
+      .setCustomId(`painelconfig_save_bau_create_${name}_${channelId}_`)
+      .setLabel('Salvar Cargos')
+      .setStyle(ButtonStyle.Success)
+      .setEmoji('💾');
+
     const btnBack = new ButtonBuilder()
       .setCustomId('painelconfig_btn_back_bau')
       .setLabel('Voltar')
@@ -633,10 +685,10 @@ export async function handleInteraction(interaction) {
       .setEmoji('↩️');
 
     const row = new ActionRowBuilder().addComponents(selectRoles);
-    const rowBack = new ActionRowBuilder().addComponents(btnBack);
+    const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
     return await interaction.update({
       content: `Selecione até 5 cargos permitidos a adicionar/remover itens no baú **${name}** (<#${channelId}>):`,
-      components: [row, rowBack]
+      components: [row, rowBtns]
     });
   }
 
@@ -772,16 +824,40 @@ export async function handleInteraction(interaction) {
 
     // Alterar cargos de fluxo simples
     if (action === 'roles') {
+      let existingRoles = [];
+      if (moduleName === 'venda') {
+        existingRoles = getGlobalVendaConfig()?.cargosPermitidosIds || [];
+      } else if (moduleName === 'encomenda') {
+        existingRoles = getGlobalEncomendaConfig()?.cargosPermitidosIds || [];
+      } else if (moduleName === 'ausencia') {
+        existingRoles = getGlobalAusenciaConfig()?.cargosPermitidosIds || [];
+      } else if (moduleName === 'recrutamento') {
+        existingRoles = getGlobalRecrutamentoConfig()?.cargosStaffIds || [];
+      }
+
       const select = new RoleSelectMenuBuilder()
         .setCustomId(`painelconfig_tempselect_simple_${moduleName}`)
         .setPlaceholder(`Selecione os cargos para ${moduleName}...`)
         .setMinValues(1)
         .setMaxValues(5);
 
+      const btnSave = new ButtonBuilder()
+        .setCustomId(`painelconfig_save_simple_${moduleName}_${existingRoles.join('_')}`)
+        .setLabel('Salvar Cargos')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('💾');
+
+      const btnBack = new ButtonBuilder()
+        .setCustomId(`painelconfig_btn_back_simple_${moduleName}`)
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('↩️');
+
       const row = new ActionRowBuilder().addComponents(select);
+      const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
       return await interaction.update({
         content: `Selecione abaixo os cargos permitidos para o módulo **${moduleName}**:`,
-        components: [row, rowBack]
+        components: [row, rowBtns]
       });
     }
 
@@ -910,7 +986,7 @@ export async function handleInteraction(interaction) {
     const payload = customId.replace('painelconfig_save_', '');
     
     if (payload.startsWith('adv_staff_')) {
-      const roleIds = payload.replace('adv_staff_', '').split('_');
+      const roleIds = payload.replace('adv_staff_', '').split('_').filter(id => id);
       const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Id: [], cargo2Id: [], cargo3Id: [], cargosStaffIds: [] };
       config.cargosStaffIds = roleIds;
       saveAdvConfig(config);
@@ -921,7 +997,7 @@ export async function handleInteraction(interaction) {
     if (payload.startsWith('adv_cargo')) {
       // payload = adv_cargo1_role1_role2...
       const level = payload.charAt(9); // 1, 2, 3
-      const roleIds = payload.substring(11).split('_');
+      const roleIds = payload.substring(11).split('_').filter(id => id);
       const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Id: [], cargo2Id: [], cargo3Id: [], cargosStaffIds: [] };
       config[`cargo${level}Id`] = roleIds;
       saveAdvConfig(config);
@@ -930,7 +1006,7 @@ export async function handleInteraction(interaction) {
     }
     
     if (payload.startsWith('farm_')) {
-      const roleIds = payload.replace('farm_', '').split('_');
+      const roleIds = payload.replace('farm_', '').split('_').filter(id => id);
       const config = getGlobalFarmConfig() || { painelCanalId: '', categoriaId: '', cargosAdminIds: [] };
       config.cargosAdminIds = roleIds;
       saveGlobalFarmConfig(config);
@@ -943,7 +1019,14 @@ export async function handleInteraction(interaction) {
       const parts = payload.replace('bau_create_', '').split('_');
       const name = parts[0];
       const channelId = parts[1];
-      const rolesIds = parts.slice(2);
+      const rolesIds = parts.slice(2).filter(id => id);
+      
+      if (rolesIds.length === 0) {
+        return await interaction.reply({
+          content: '❌ Você precisa selecionar pelo menos 1 cargo autorizado antes de salvar!',
+          ephemeral: true
+        });
+      }
       
       try {
         const channel = await guild.channels.fetch(channelId).catch(() => null);
@@ -1000,7 +1083,7 @@ export async function handleInteraction(interaction) {
       // payload = simple_venda_role1_role2...
       const parts = payload.replace('simple_', '').split('_');
       const moduleName = parts[0];
-      const rolesIds = parts.slice(1);
+      const rolesIds = parts.slice(1).filter(id => id);
       
       if (moduleName === 'venda') {
         const config = getGlobalVendaConfig() || { forumCanalId: '', cargosPermitidosIds: [] };
