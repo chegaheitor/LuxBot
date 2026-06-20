@@ -270,6 +270,13 @@ export async function handleInteraction(interaction) {
   if (interaction.isButton() && customId.startsWith('painelconfig_btn_adv_')) {
     const action = customId.replace('painelconfig_btn_adv_', '');
 
+    const btnBack = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_back_adv')
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+    const rowBack = new ActionRowBuilder().addComponents(btnBack);
+
     if (action === 'ch_alertas') {
       const select = new ChannelSelectMenuBuilder()
         .setCustomId('painelconfig_selectchan_adv_alertas')
@@ -279,7 +286,7 @@ export async function handleInteraction(interaction) {
       const row = new ActionRowBuilder().addComponents(select);
       return await interaction.update({
         content: 'Selecione abaixo o canal onde serão publicados os avisos das advertências aplicadas:',
-        components: [row]
+        components: [row, rowBack]
       });
     }
 
@@ -292,7 +299,7 @@ export async function handleInteraction(interaction) {
       const row = new ActionRowBuilder().addComponents(select);
       return await interaction.update({
         content: 'Selecione abaixo o canal onde a Staff receberá os pedidos de revogação das advertências:',
-        components: [row]
+        components: [row, rowBack]
       });
     }
 
@@ -306,7 +313,7 @@ export async function handleInteraction(interaction) {
       const row = new ActionRowBuilder().addComponents(select);
       return await interaction.update({
         content: 'Selecione abaixo até 4 cargos de Staff permitidos a aplicar/revogar advertências:',
-        components: [row]
+        components: [row, rowBack]
       });
     }
 
@@ -314,9 +321,9 @@ export async function handleInteraction(interaction) {
       const btn1 = new ButtonBuilder().setCustomId('painelconfig_btn_adv_set_c1').setLabel('Definir Cargo Adv 1').setStyle(ButtonStyle.Primary);
       const btn2 = new ButtonBuilder().setCustomId('painelconfig_btn_adv_set_c2').setLabel('Definir Cargo Adv 2').setStyle(ButtonStyle.Primary);
       const btn3 = new ButtonBuilder().setCustomId('painelconfig_btn_adv_set_c3').setLabel('Definir Cargo Adv 3').setStyle(ButtonStyle.Primary);
-      const btnBack = new ButtonBuilder().setCustomId('painelconfig_btn_back_adv').setLabel('Voltar').setStyle(ButtonStyle.Secondary);
+      const btnBackAdv = new ButtonBuilder().setCustomId('painelconfig_btn_back_adv').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
       
-      const row = new ActionRowBuilder().addComponents(btn1, btn2, btn3, btnBack);
+      const row = new ActionRowBuilder().addComponents(btn1, btn2, btn3, btnBackAdv);
       return await interaction.update({
         content: 'Selecione qual cargo de advertência você quer configurar:',
         embeds: [],
@@ -333,10 +340,18 @@ export async function handleInteraction(interaction) {
       .setMinValues(1)
       .setMaxValues(1);
     
+    const btnBack = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_adv_cargos_adv')
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+    
     const row = new ActionRowBuilder().addComponents(select);
+    const rowBack = new ActionRowBuilder().addComponents(btnBack);
+
     return await interaction.update({
       content: `Selecione o cargo correspondente ao acúmulo de **${level} advertência(s)** no servidor:`,
-      components: [row]
+      components: [row, rowBack]
     });
   }
 
@@ -384,6 +399,13 @@ export async function handleInteraction(interaction) {
   if (interaction.isButton() && customId.startsWith('painelconfig_btn_farm_')) {
     const action = customId.replace('painelconfig_btn_farm_', '');
 
+    const btnBack = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_back_farm')
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+    const rowBack = new ActionRowBuilder().addComponents(btnBack);
+
     if (action === 'channels') {
       const selectPanel = new ChannelSelectMenuBuilder()
         .setCustomId('painelconfig_selectchan_farm_panel')
@@ -400,7 +422,7 @@ export async function handleInteraction(interaction) {
 
       return await interaction.update({
         content: 'Configure abaixo o canal do painel e a categoria correspondente de farm:',
-        components: [rowP, rowC]
+        components: [rowP, rowC, rowBack]
       });
     }
 
@@ -414,7 +436,7 @@ export async function handleInteraction(interaction) {
       const row = new ActionRowBuilder().addComponents(select);
       return await interaction.update({
         content: 'Selecione abaixo até 3 cargos autorizados a gerenciar as metas e canais de farm:',
-        components: [row]
+        components: [row, rowBack]
       });
     }
 
@@ -513,10 +535,18 @@ export async function handleInteraction(interaction) {
       .setPlaceholder('Escolha o material para remover...')
       .addOptions(materials.map(m => ({ label: m, value: m })));
 
+    const btnBack = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_farm_materials')
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+
     const row = new ActionRowBuilder().addComponents(select);
+    const rowBack = new ActionRowBuilder().addComponents(btnBack);
+
     return await interaction.update({
       content: 'Selecione abaixo o material que deseja excluir permanentemente:',
-      components: [row]
+      components: [row, rowBack]
     });
   }
 
@@ -597,11 +627,17 @@ export async function handleInteraction(interaction) {
       .setPlaceholder('Escolha o canal onde enviar o baú...')
       .addChannelTypes(ChannelType.GuildText);
 
+    const btnBack = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_back_bau')
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+
     const row = new ActionRowBuilder().addComponents(selectChan);
-    return await interaction.reply({
+    const rowBack = new ActionRowBuilder().addComponents(btnBack);
+    return await interaction.update({
       content: `Selecione o canal onde deseja enviar o baú **${name}**:`,
-      components: [row],
-      ephemeral: true
+      components: [row, rowBack]
     });
   }
 
@@ -615,10 +651,17 @@ export async function handleInteraction(interaction) {
       .setMinValues(1)
       .setMaxValues(5);
 
+    const btnBack = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_back_bau')
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+
     const row = new ActionRowBuilder().addComponents(selectRoles);
+    const rowBack = new ActionRowBuilder().addComponents(btnBack);
     return await interaction.update({
       content: `Selecione até 5 cargos permitidos a adicionar/remover itens no baú **${name}** (<#${channelId}>):`,
-      components: [row]
+      components: [row, rowBack]
     });
   }
 
@@ -724,10 +767,18 @@ export async function handleInteraction(interaction) {
       .setPlaceholder('Escolha o item para remover...')
       .addOptions(items.map(i => ({ label: i, value: i })));
 
+    const btnBack = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_bau_items')
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+
     const row = new ActionRowBuilder().addComponents(select);
+    const rowBack = new ActionRowBuilder().addComponents(btnBack);
+
     return await interaction.update({
       content: 'Selecione abaixo o item que deseja excluir da lista global de baús:',
-      components: [row]
+      components: [row, rowBack]
     });
   }
 
@@ -748,6 +799,13 @@ export async function handleInteraction(interaction) {
     const parts = customId.replace('painelconfig_btn_simple_', '').split('_');
     const action = parts[0];
     const moduleName = parts[1];
+
+    const btnBack = new ButtonBuilder()
+      .setCustomId(`painelconfig_btn_back_simple_${moduleName}`)
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+    const rowBack = new ActionRowBuilder().addComponents(btnBack);
 
     // Alterar canais de fluxo simples
     if (action === 'channels') {
@@ -772,7 +830,8 @@ export async function handleInteraction(interaction) {
           components: [
             new ActionRowBuilder().addComponents(selectWelcome),
             new ActionRowBuilder().addComponents(selectPedidos),
-            new ActionRowBuilder().addComponents(selectLogs)
+            new ActionRowBuilder().addComponents(selectLogs),
+            rowBack
           ]
         });
       } else {
@@ -787,7 +846,7 @@ export async function handleInteraction(interaction) {
         const row = new ActionRowBuilder().addComponents(select);
         return await interaction.update({
           content: `Selecione abaixo o canal/fórum correspondente ao módulo **${moduleName}**:`,
-          components: [row]
+          components: [row, rowBack]
         });
       }
     }
@@ -803,7 +862,7 @@ export async function handleInteraction(interaction) {
       const row = new ActionRowBuilder().addComponents(select);
       return await interaction.update({
         content: `Selecione abaixo até 5 cargos permitidos para o módulo **${moduleName}**:`,
-        components: [row]
+        components: [row, rowBack]
       });
     }
 
