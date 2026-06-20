@@ -122,10 +122,17 @@ export async function execute(interaction) {
 
     const embed = generateMainEmbed();
     const row = generateMainRow();
+    
+    const btnDb = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_download_db')
+      .setLabel('Baixar Banco de Dados')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('💾');
+    const rowBtns = new ActionRowBuilder().addComponents(btnDb);
 
     await interaction.reply({
       embeds: [embed],
-      components: [row]
+      components: [row, rowBtns]
     });
 
   } catch (error) {
@@ -185,15 +192,132 @@ export async function handleInteraction(interaction) {
   }
 
   // ========================================================
-  // 2. RETORNO AO MENU PRINCIPAL (BOTÃO VOLTAR)
+  // 2. RETORNO AO MENU PRINCIPAL (BOTÃO VOLTAR) E AÇÕES DE DB
   // ========================================================
   if (interaction.isButton() && customId === 'painelconfig_btn_back') {
     try {
       const embed = generateMainEmbed();
       const row = generateMainRow();
-      return await interaction.update({ embeds: [embed], components: [row] });
+      const btnDb = new ButtonBuilder()
+        .setCustomId('painelconfig_btn_download_db')
+        .setLabel('Baixar Banco de Dados')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('💾');
+      const rowBtns = new ActionRowBuilder().addComponents(btnDb);
+      return await interaction.update({ embeds: [embed], components: [row, rowBtns] });
     } catch (e) {
       console.error(e);
+    }
+  }
+
+  if (interaction.isButton() && customId === 'painelconfig_btn_download_db') {
+    try {
+      return await interaction.reply({
+        content: '📦 Aqui está o arquivo do banco de dados atualizado:',
+        files: [{
+          attachment: './database.json',
+          name: 'database.json'
+        }],
+        ephemeral: true
+      });
+    } catch (error) {
+      console.error('Erro ao enviar banco de dados:', error);
+      return await interaction.reply({
+        content: '❌ Ocorreu um erro ao tentar exportar o banco de dados.',
+        ephemeral: true
+      });
+    }
+  }
+
+  // ========================================================
+  // 3. LIMPEZA DE CONFIGURAÇÃO (LIMPAR CONFIG)
+  // ========================================================
+  if (interaction.isButton() && customId.startsWith('painelconfig_btn_clear_')) {
+    const moduleName = customId.replace('painelconfig_btn_clear_', '');
+    
+    const embedConfirm = new EmbedBuilder()
+      .setTitle('⚠️ CONFIRMAR EXCLUSÃO DE CONFIGURAÇÃO ⚠️')
+      .setDescription(
+        `Você tem certeza de que deseja limpar todas as configurações do módulo **${moduleName.toUpperCase()}**?\n` +
+        `Esta ação é irreversível e irá apagar todos os canais, cargos e dados vinculados a este módulo no banco de dados local.`
+      )
+      .setColor(15548997)
+      .setTimestamp();
+
+    const btnConfirm = new ButtonBuilder()
+      .setCustomId(`painelconfig_confirm_clear_${moduleName}`)
+      .setLabel('Confirmar Limpeza')
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji('🗑️');
+
+    const btnCancel = new ButtonBuilder()
+      .setCustomId(`painelconfig_cancel_clear_${moduleName}`)
+      .setLabel('Cancelar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('❌');
+
+    const row = new ActionRowBuilder().addComponents(btnConfirm, btnCancel);
+    return await interaction.update({ embeds: [embedConfirm], components: [row] });
+  }
+
+  if (interaction.isButton() && customId.startsWith('painelconfig_cancel_clear_')) {
+    const moduleName = customId.replace('painelconfig_cancel_clear_', '');
+    if (moduleName === 'logs') return await showLogsMenu(interaction);
+    if (moduleName === 'adv') return await showAdvMenu(interaction);
+    if (moduleName === 'farm') return await showFarmMenu(interaction);
+    if (moduleName === 'bau') return await showBauMenu(interaction);
+    if (moduleName.startsWith('simple_')) {
+      const simpleMod = moduleName.replace('simple_', '');
+      return await showSimpleModuleMenu(interaction, simpleMod);
+    }
+  }
+
+  if (interaction.isButton() && customId.startsWith('painelconfig_confirm_clear_')) {
+    const moduleName = customId.replace('painelconfig_confirm_clear_', '');
+    
+    if (moduleName === 'logs') {
+      const db = getDatabase();
+      db.logChannels = {};
+      saveDatabase(db);
+      await interaction.reply({ content: '✅ Todas as configurações de Logs foram limpas com sucesso!', ephemeral: true });
+      return await showLogsMenu(interaction);
+    }
+    
+    if (moduleName === 'adv') {
+      saveAdvConfig(null);
+      await interaction.reply({ content: '✅ Todas as configurações de Advertências foram limpas com sucesso!', ephemeral: true });
+      return await showAdvMenu(interaction);
+    }
+    
+    if (moduleName === 'farm') {
+      const db = getDatabase();
+      db.farmPaineis = [];
+      db.farmCanais = [];
+      delete db.farmMaterials;
+      saveDatabase(db);
+      await interaction.reply({ content: '✅ Todas as configurações de Farm foram limpas com sucesso!', ephemeral: true });
+      return await showFarmMenu(interaction);
+    }
+    
+    if (moduleName === 'bau') {
+      const db = getDatabase();
+      db.baus = [];
+      delete db.bauItems;
+      saveDatabase(db);
+      await interaction.reply({ content: '✅ Todas as configurações de Baús foram limpas com sucesso!', ephemeral: true });
+      return await showBauMenu(interaction);
+    }
+    
+    if (moduleName.startsWith('simple_')) {
+      const simpleMod = moduleName.replace('simple_', '');
+      const db = getDatabase();
+      if (simpleMod === 'venda') db.vendaPaineis = [];
+      else if (simpleMod === 'encomenda') db.encomendaPaineis = [];
+      else if (simpleMod === 'ausencia') db.ausenciaPaineis = [];
+      else if (simpleMod === 'recrutamento') db.paineis = [];
+      saveDatabase(db);
+      await interaction.reply({ content: `✅ Todas as configurações do módulo **${simpleMod}** foram limpas com sucesso!`, ephemeral: true });
+      return await showSimpleModuleMenu(interaction, simpleMod);
     }
   }
 
@@ -1139,6 +1263,12 @@ async function showLogsMenu(interaction) {
     .setPlaceholder('Selecione o comando para configurar...')
     .addOptions(commands.map(cmd => ({ label: `/${cmd}`, value: cmd })));
 
+  const btnLimpar = new ButtonBuilder()
+    .setCustomId('painelconfig_btn_clear_logs')
+    .setLabel('Limpar Config')
+    .setStyle(ButtonStyle.Danger)
+    .setEmoji('🗑️');
+
   const btnVoltar = new ButtonBuilder()
     .setCustomId('painelconfig_btn_back')
     .setLabel('Voltar ao Menu')
@@ -1146,7 +1276,7 @@ async function showLogsMenu(interaction) {
     .setEmoji('↩️');
 
   const rowSel = new ActionRowBuilder().addComponents(select);
-  const rowBtn = new ActionRowBuilder().addComponents(btnVoltar);
+  const rowBtn = new ActionRowBuilder().addComponents(btnLimpar, btnVoltar);
 
   return await interaction.update({ embeds: [embed], components: [rowSel, rowBtn] });
 }
@@ -1190,10 +1320,11 @@ async function showAdvMenu(interaction) {
   const btnChRevs = new ButtonBuilder().setCustomId('painelconfig_btn_adv_ch_revocacoes').setLabel('Canal Revogações').setStyle(ButtonStyle.Primary).setEmoji('⚖️');
   const btnStaff = new ButtonBuilder().setCustomId('painelconfig_btn_adv_staff').setLabel('Alterar Staff').setStyle(ButtonStyle.Primary).setEmoji('💼');
   const btnCargos = new ButtonBuilder().setCustomId('painelconfig_btn_adv_cargos_adv').setLabel('Cargos Adv 1/2/3').setStyle(ButtonStyle.Primary).setEmoji('⚠️');
+  const btnLimpar = new ButtonBuilder().setCustomId('painelconfig_btn_clear_adv').setLabel('Limpar Config').setStyle(ButtonStyle.Danger).setEmoji('🗑️');
   const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
 
   const row1 = new ActionRowBuilder().addComponents(btnChAlerts, btnChRevs, btnStaff, btnCargos);
-  const row2 = new ActionRowBuilder().addComponents(btnVoltar);
+  const row2 = new ActionRowBuilder().addComponents(btnLimpar, btnVoltar);
 
   return await interaction.update({ embeds: [embed], components: [row1, row2] });
 }
@@ -1226,10 +1357,11 @@ async function showFarmMenu(interaction) {
   const btnRoles = new ButtonBuilder().setCustomId('painelconfig_btn_farm_roles').setLabel('Alterar Cargos').setStyle(ButtonStyle.Primary).setEmoji('👥');
   const btnMaterials = new ButtonBuilder().setCustomId('painelconfig_btn_farm_materials').setLabel('Editar Materiais').setStyle(ButtonStyle.Primary).setEmoji('🌾');
   const btnCriar = new ButtonBuilder().setCustomId('painelconfig_btn_farm_criar').setLabel('Criar Painel').setStyle(ButtonStyle.Success).setEmoji('➕');
+  const btnLimpar = new ButtonBuilder().setCustomId('painelconfig_btn_clear_farm').setLabel('Limpar Config').setStyle(ButtonStyle.Danger).setEmoji('🗑️');
   const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
 
   const row1 = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnMaterials, btnCriar);
-  const row2 = new ActionRowBuilder().addComponents(btnVoltar);
+  const row2 = new ActionRowBuilder().addComponents(btnLimpar, btnVoltar);
 
   return await interaction.update({ embeds: [embed], components: [row1, row2] });
 }
@@ -1254,9 +1386,10 @@ async function showBauMenu(interaction) {
 
   const btnCriar = new ButtonBuilder().setCustomId('painelconfig_btn_bau_criar_bau').setLabel('Criar Novo Baú').setStyle(ButtonStyle.Success).setEmoji('📦');
   const btnItems = new ButtonBuilder().setCustomId('painelconfig_btn_bau_items').setLabel('Editar Itens').setStyle(ButtonStyle.Primary).setEmoji('⚙️');
+  const btnLimpar = new ButtonBuilder().setCustomId('painelconfig_btn_clear_bau').setLabel('Limpar Config').setStyle(ButtonStyle.Danger).setEmoji('🗑️');
   const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
 
-  const row = new ActionRowBuilder().addComponents(btnCriar, btnItems, btnVoltar);
+  const row = new ActionRowBuilder().addComponents(btnCriar, btnItems, btnLimpar, btnVoltar);
 
   return await interaction.update({ embeds: [embed], components: [row] });
 }
@@ -1332,9 +1465,10 @@ async function showSimpleModuleMenu(interaction, moduleName) {
   const btnChannels = new ButtonBuilder().setCustomId(`painelconfig_btn_simple_channels_${moduleName}`).setLabel(moduleName === 'recrutamento' ? 'Canais' : 'Canal/Fórum').setStyle(ButtonStyle.Primary).setEmoji('📢');
   const btnRoles = new ButtonBuilder().setCustomId(`painelconfig_btn_simple_roles_${moduleName}`).setLabel('Cargos').setStyle(ButtonStyle.Primary).setEmoji('👥');
   const btnCriar = new ButtonBuilder().setCustomId(`painelconfig_btn_simple_criar_${moduleName}`).setLabel('Criar Painel').setStyle(ButtonStyle.Success).setEmoji('➕');
+  const btnLimpar = new ButtonBuilder().setCustomId(`painelconfig_btn_clear_simple_${moduleName}`).setLabel('Limpar Config').setStyle(ButtonStyle.Danger).setEmoji('🗑️');
   const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
 
-  const row = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnCriar, btnVoltar);
+  const row = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnCriar, btnLimpar, btnVoltar);
 
   return await interaction.update({ embeds: [embed], components: [row] });
 }
