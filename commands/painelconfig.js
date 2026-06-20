@@ -305,14 +305,14 @@ export async function handleInteraction(interaction) {
 
     if (action === 'staff') {
       const select = new RoleSelectMenuBuilder()
-        .setCustomId('painelconfig_selectroles_adv_staff')
+        .setCustomId('painelconfig_tempselect_adv_staff')
         .setPlaceholder('Escolha os cargos autorizados a aplicar/remover Adv...')
         .setMinValues(1)
-        .setMaxValues(4);
+        .setMaxValues(5);
       
       const row = new ActionRowBuilder().addComponents(select);
       return await interaction.update({
-        content: 'Selecione abaixo até 4 cargos de Staff permitidos a aplicar/revogar advertências:',
+        content: 'Selecione abaixo os cargos de Staff permitidos a aplicar/revogar advertências:',
         components: [row, rowBack]
       });
     }
@@ -335,10 +335,10 @@ export async function handleInteraction(interaction) {
   if (interaction.isButton() && customId.startsWith('painelconfig_btn_adv_set_c')) {
     const level = customId.replace('painelconfig_btn_adv_set_c', '');
     const select = new RoleSelectMenuBuilder()
-      .setCustomId(`painelconfig_selectrole_adv_cargo${level}`)
-      .setPlaceholder(`Selecione o cargo para Adv ${level}...`)
+      .setCustomId(`painelconfig_tempselect_adv_cargo${level}`)
+      .setPlaceholder(`Selecione os cargos para Adv ${level}...`)
       .setMinValues(1)
-      .setMaxValues(1);
+      .setMaxValues(5);
     
     const btnBack = new ButtonBuilder()
       .setCustomId('painelconfig_btn_adv_cargos_adv')
@@ -350,7 +350,7 @@ export async function handleInteraction(interaction) {
     const rowBack = new ActionRowBuilder().addComponents(btnBack);
 
     return await interaction.update({
-      content: `Selecione o cargo correspondente ao acúmulo de **${level} advertência(s)** no servidor:`,
+      content: `Selecione os cargos correspondentes ao acúmulo de **${level} advertência(s)** no servidor:`,
       components: [row, rowBack]
     });
   }
@@ -411,14 +411,14 @@ export async function handleInteraction(interaction) {
 
     if (action === 'roles') {
       const select = new RoleSelectMenuBuilder()
-        .setCustomId('painelconfig_selectroles_farm')
+        .setCustomId('painelconfig_tempselect_farm')
         .setPlaceholder('Escolha os cargos autorizados a gerenciar metas e farms...')
         .setMinValues(1)
-        .setMaxValues(3);
+        .setMaxValues(5);
       
       const row = new ActionRowBuilder().addComponents(select);
       return await interaction.update({
-        content: 'Selecione abaixo até 3 cargos autorizados a gerenciar as metas e canais de farm:',
+        content: 'Selecione abaixo os cargos autorizados a gerenciar as metas e canais de farm:',
         components: [row, rowBack]
       });
     }
@@ -621,7 +621,7 @@ export async function handleInteraction(interaction) {
     const channelId = interaction.values[0];
 
     const selectRoles = new RoleSelectMenuBuilder()
-      .setCustomId(`painelconfig_selectroles_bau_create_${name}_${channelId}`)
+      .setCustomId(`painelconfig_tempselect_bau_create_${name}_${channelId}`)
       .setPlaceholder('Selecione os cargos autorizados...')
       .setMinValues(1)
       .setMaxValues(5);
@@ -773,14 +773,14 @@ export async function handleInteraction(interaction) {
     // Alterar cargos de fluxo simples
     if (action === 'roles') {
       const select = new RoleSelectMenuBuilder()
-        .setCustomId(`painelconfig_selectroles_simple_${moduleName}`)
+        .setCustomId(`painelconfig_tempselect_simple_${moduleName}`)
         .setPlaceholder(`Selecione os cargos para ${moduleName}...`)
         .setMinValues(1)
         .setMaxValues(5);
 
       const row = new ActionRowBuilder().addComponents(select);
       return await interaction.update({
-        content: `Selecione abaixo até 5 cargos permitidos para o módulo **${moduleName}**:`,
+        content: `Selecione abaixo os cargos permitidos para o módulo **${moduleName}**:`,
         components: [row, rowBack]
       });
     }
