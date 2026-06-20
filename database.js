@@ -7,7 +7,7 @@ const DB_PATH = path.resolve('database.json');
 export function initDatabase() {
   const defaultBauItems = ['Ferro', 'Madeira', 'Armas', 'Munição', 'Kits', 'Dinheiro', 'Outros'];
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [], bauItems: defaultBauItems }, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [], bauItems: defaultBauItems, advConfig: null }, null, 2));
   } else {
     try {
       const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
@@ -22,11 +22,12 @@ export function initDatabase() {
       if (!data.ausenciaPaineis) { data.ausenciaPaineis = []; modified = true; }
       if (!data.baus) { data.baus = []; modified = true; }
       if (!data.bauItems) { data.bauItems = defaultBauItems; modified = true; }
+      if (data.advConfig === undefined) { data.advConfig = null; modified = true; }
       if (modified) {
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
       }
     } catch (e) {
-      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [], bauItems: defaultBauItems }, null, 2));
+      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [], bauItems: defaultBauItems, advConfig: null }, null, 2));
     }
   }
 }
@@ -395,7 +396,8 @@ export function getOrCreateRecruta(userId, tag = 'Desconhecido') {
       ausencias: [],
       vendas: [],
       encomendas: [],
-      metas: []
+      metas: [],
+      warnings: []
     };
     recrutas.push(recruta);
     saveDatabase({ ...db, recrutas });
@@ -405,6 +407,7 @@ export function getOrCreateRecruta(userId, tag = 'Desconhecido') {
     if (!recruta.vendas) { recruta.vendas = []; updated = true; }
     if (!recruta.encomendas) { recruta.encomendas = []; updated = true; }
     if (!recruta.metas) { recruta.metas = []; updated = true; }
+    if (!recruta.warnings) { recruta.warnings = []; updated = true; }
     if (updated) {
       saveDatabase({ ...db, recrutas });
     }
@@ -505,6 +508,71 @@ export function saveBauItems(items) {
 export function getBauItems() {
   const db = getDatabase();
   return db.bauItems || ['Ferro', 'Madeira', 'Armas', 'Munição', 'Kits', 'Dinheiro', 'Outros'];
+}
+
+// Salva a configuração de advertências
+export function saveAdvConfig(config) {
+  const db = getDatabase();
+  db.advConfig = config;
+  return saveDatabase(db);
+}
+
+// Retorna a configuração de advertências
+export function getAdvConfig() {
+  const db = getDatabase();
+  return db.advConfig || null;
+}
+
+// Adiciona uma advertência a um membro
+export function addWarning(userId, tag, warningData) {
+  const recruta = getOrCreateRecruta(userId, tag);
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  const index = recrutas.findIndex(r => r.discordId === userId);
+
+  if (index !== -1) {
+    if (!recrutas[index].warnings) recrutas[index].warnings = [];
+    
+    // Obter número atual de advertências ativas
+    const activeCountBefore = recrutas[index].warnings.filter(w => w.active).length;
+    const activeCount = Math.min(activeCountBefore + 1, 3); // Limitar a no máximo 3
+
+    recrutas[index].warnings.push({
+      ...warningData,
+      active: true,
+      countAfter: activeCount,
+      timestamp: new Date().toISOString()
+    });
+
+    saveDatabase({ ...db, recrutas });
+    return activeCount;
+  }
+  return 0;
+}
+
+// Remove uma advertência ativa de um membro (marca como inativa)
+export function removeWarning(userId, removerId, reason) {
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  const index = recrutas.findIndex(r => r.discordId === userId);
+
+  if (index !== -1 && recrutas[index].warnings) {
+    // Achar a última advertência ativa
+    const activeWarnings = recrutas[index].warnings.filter(w => w.active);
+    if (activeWarnings.length > 0) {
+      const lastActive = activeWarnings[activeWarnings.length - 1];
+      lastActive.active = false;
+      lastActive.removedBy = removerId;
+      lastActive.removedReason = reason;
+      lastActive.removedAt = new Date().toISOString();
+
+      const newActiveCount = activeWarnings.length - 1;
+
+      saveDatabase({ ...db, recrutas });
+      return newActiveCount;
+    }
+  }
+  return 0;
 }
 
 

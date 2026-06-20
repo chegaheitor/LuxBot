@@ -56,6 +56,13 @@ function createStatsMenu(targetUserId, executorId, selectedValue = 'principal') 
         emoji: '🛠️', 
         description: 'Metas declaradas e status de pagamento',
         default: selectedValue === 'metas'
+      },
+      { 
+        label: 'Advertências', 
+        value: 'advertencias', 
+        emoji: '⚠️', 
+        description: 'Histórico de advertências do membro',
+        default: selectedValue === 'advertencias'
       }
     ]);
 
@@ -162,6 +169,30 @@ export function generatePerfilEmbed(targetUser, recruta, tab = 'principal') {
       embed.addFields({ name: '📈 Últimas Metas Batidas:', value: list });
     } else {
       embed.addFields({ name: '📈 Últimas Metas Batidas:', value: 'Nenhuma meta batida declarada.' });
+    }
+  }
+
+  else if (tab === 'advertencias') {
+    const activeCount = recruta.warnings ? recruta.warnings.filter(w => w.active).length : 0;
+    embed
+      .setTitle('⚠️ HISTÓRICO DE ADVERTÊNCIAS ⚠️')
+      .setDescription(`Histórico completo de advertências oficiais.\n\n**📊 Advertências Ativas:** \`${activeCount} / 3\``)
+      .setColor(15105570) // Laranja/Vermelho
+      .setFooter({ text: 'Lux Perfil • Advertências' });
+
+    if (recruta.warnings && recruta.warnings.length > 0) {
+      const list = recruta.warnings.slice(-5).reverse().map((w, i) => {
+        const dateStr = w.timestamp ? new Date(w.timestamp).toLocaleDateString('pt-BR') : 'Data desconhecida';
+        if (w.active) {
+          return `**${i + 1}. ⚠️ Nível ${w.countAfter} / 3** (Aplicado por <@${w.authorId}> em ${dateStr})\n   **Motivo:** ${w.reason}`;
+        } else {
+          const removedDateStr = w.removedAt ? new Date(w.removedAt).toLocaleDateString('pt-BR') : '';
+          return `**${i + 1}. ~~⚠️ Nível ${w.countAfter} / 3~~** (Aplicado por <@${w.authorId}>)\n   **❌ REMOVIDA** por <@${w.removedBy}> em ${removedDateStr}\n   **Motivo da Remoção:** *${w.removedReason}*`;
+        }
+      }).join('\n\n');
+      embed.addFields({ name: '📝 Registros Recentes:', value: list });
+    } else {
+      embed.addFields({ name: '📝 Registros Recentes:', value: 'Nenhuma advertência registrada para este membro.' });
     }
   }
 
