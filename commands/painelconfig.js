@@ -449,11 +449,11 @@ export async function handleInteraction(interaction) {
     
     saveLogChannel(commandName, channelId);
 
-    await interaction.reply({
+    await showLogsMenu(interaction);
+    return await interaction.followUp({
       content: `✅ Logs do comando **/${commandName}** associados com sucesso ao canal <#${channelId}>!`,
       ephemeral: true
     });
-    return await showLogsMenu(interaction);
   }
 
   if (interaction.isButton() && customId.startsWith('painelconfig_logs_disable_')) {
@@ -461,11 +461,11 @@ export async function handleInteraction(interaction) {
     
     saveLogChannel(commandName, null);
 
-    await interaction.reply({
+    await showLogsMenu(interaction);
+    return await interaction.followUp({
       content: `📢 Logs do comando **/${commandName}** desativados com sucesso!`,
       ephemeral: true
     });
-    return await showLogsMenu(interaction);
   }
 
   if (interaction.isButton() && customId === 'painelconfig_btn_back_logs') {
@@ -602,16 +602,16 @@ export async function handleInteraction(interaction) {
     const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Id: '', cargo2Id: '', cargo3Id: '', cargosStaffIds: [] };
     config.canalId = interaction.values[0];
     saveAdvConfig(config);
-    await interaction.reply({ content: '✅ Canal de alertas de advertência updated!', ephemeral: true });
-    return await showAdvMenu(interaction);
+    await showAdvMenu(interaction);
+    return await interaction.followUp({ content: '✅ Canal de alertas de advertência atualizado!', ephemeral: true });
   }
 
   if (interaction.isChannelSelectMenu() && customId === 'painelconfig_selectchan_adv_revocacoes') {
     const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Id: '', cargo2Id: '', cargo3Id: '', cargosStaffIds: [] };
     config.canalRevogacaoId = interaction.values[0];
     saveAdvConfig(config);
-    await interaction.reply({ content: '✅ Canal de revogações de advertência updated!', ephemeral: true });
-    return await showAdvMenu(interaction);
+    await showAdvMenu(interaction);
+    return await interaction.followUp({ content: '✅ Canal de revogações de advertência atualizado!', ephemeral: true });
   }
 
   // ========================================================
@@ -749,8 +749,8 @@ export async function handleInteraction(interaction) {
     materials.push(name);
     saveFarmMaterials(materials);
 
-    await interaction.reply({ content: `✅ Material **${name}** adicionado com sucesso!`, ephemeral: true });
-    return await showFarmMenu(interaction);
+    await showFarmMenu(interaction);
+    return await interaction.followUp({ content: `✅ Material **${name}** adicionado com sucesso!`, ephemeral: true });
   }
 
   if (interaction.isButton() && customId === 'painelconfig_btn_farm_materials_remove') {
@@ -785,8 +785,8 @@ export async function handleInteraction(interaction) {
     materials = materials.filter(m => m !== target);
     saveFarmMaterials(materials);
 
-    await interaction.reply({ content: `✅ Material **${target}** removido com sucesso!`, ephemeral: true });
-    return await showFarmMenu(interaction);
+    await showFarmMenu(interaction);
+    return await interaction.followUp({ content: `✅ Material **${target}** removido com sucesso!`, ephemeral: true });
   }
 
   // Canais de Farm selecionados
@@ -794,16 +794,16 @@ export async function handleInteraction(interaction) {
     const config = getGlobalFarmConfig() || { painelCanalId: '', categoriaId: '', cargosAdminIds: [] };
     config.painelCanalId = interaction.values[0];
     saveGlobalFarmConfig(config);
-    await interaction.reply({ content: '✅ Canal do Painel de Farm atualizado!', ephemeral: true });
-    return await showFarmMenu(interaction);
+    await showFarmMenu(interaction);
+    return await interaction.followUp({ content: '✅ Canal do Painel de Farm atualizado!', ephemeral: true });
   }
 
   if (interaction.isChannelSelectMenu() && customId === 'painelconfig_selectchan_farm_category') {
     const config = getGlobalFarmConfig() || { painelCanalId: '', categoriaId: '', cargosAdminIds: [] };
     config.categoriaId = interaction.values[0];
     saveGlobalFarmConfig(config);
-    await interaction.reply({ content: '✅ Categoria de canais de Farm atualizada!', ephemeral: true });
-    return await showFarmMenu(interaction);
+    await showFarmMenu(interaction);
+    return await interaction.followUp({ content: '✅ Categoria de canais de Farm atualizada!', ephemeral: true });
   }
 
   // ========================================================
@@ -931,8 +931,8 @@ export async function handleInteraction(interaction) {
     items.push(name);
     saveBauItems(items);
 
-    await interaction.reply({ content: `✅ Item **${name}** cadastrado com sucesso para os baús!`, ephemeral: true });
-    return await showBauMenu(interaction);
+    await showBauMenu(interaction);
+    return await interaction.followUp({ content: `✅ Item **${name}** cadastrado com sucesso para os baús!`, ephemeral: true });
   }
 
   if (interaction.isButton() && customId === 'painelconfig_btn_bau_items_remove') {
@@ -967,8 +967,8 @@ export async function handleInteraction(interaction) {
     items = items.filter(i => i !== target);
     saveBauItems(items);
 
-    await interaction.reply({ content: `✅ Item **${target}** removido com sucesso dos baús!`, ephemeral: true });
-    return await showBauMenu(interaction);
+    await showBauMenu(interaction);
+    return await interaction.followUp({ content: `✅ Item **${target}** removido com sucesso dos baús!`, ephemeral: true });
   }
 
   // ========================================================
@@ -1112,8 +1112,8 @@ export async function handleInteraction(interaction) {
       if (channelType === 'logs') config.canalLogsNegadoId = interaction.values[0];
 
       saveGlobalRecrutamentoConfig(config);
-      await interaction.reply({ content: `✅ Canal de recrutamento (${channelType}) salvo com sucesso!`, ephemeral: true });
-      return await showSimpleModuleMenu(interaction, 'recrutamento');
+      await showSimpleModuleMenu(interaction, 'recrutamento');
+      return await interaction.followUp({ content: `✅ Canal de recrutamento (${channelType}) salvo com sucesso!`, ephemeral: true });
     } else {
       const moduleName = detail;
       const channelId = interaction.values[0];
@@ -1132,8 +1132,8 @@ export async function handleInteraction(interaction) {
         saveGlobalAusenciaConfig(config);
       }
 
-      await interaction.reply({ content: `✅ Canal do módulo **${moduleName}** atualizado!`, ephemeral: true });
-      return await showSimpleModuleMenu(interaction, moduleName);
+      await showSimpleModuleMenu(interaction, moduleName);
+      return await interaction.followUp({ content: `✅ Canal do módulo **${moduleName}** atualizado!`, ephemeral: true });
     }
   }
 
@@ -1198,8 +1198,8 @@ export async function handleInteraction(interaction) {
       const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Id: [], cargo2Id: [], cargo3Id: [], cargosStaffIds: [] };
       config.cargosStaffIds = roleIds;
       saveAdvConfig(config);
-      await interaction.reply({ content: '✅ Cargos de Staff autorizados para Adv salvos!', ephemeral: true });
-      return await showAdvMenu(interaction);
+      await showAdvMenu(interaction);
+      return await interaction.followUp({ content: '✅ Cargos de Staff autorizados para Adv salvos!', ephemeral: true });
     }
     
     if (payload.startsWith('adv_cargo')) {
@@ -1209,8 +1209,8 @@ export async function handleInteraction(interaction) {
       const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Id: [], cargo2Id: [], cargo3Id: [], cargosStaffIds: [] };
       config[`cargo${level}Id`] = roleIds;
       saveAdvConfig(config);
-      await interaction.reply({ content: `✅ Cargos para o nível Adv ${level} configurados!`, ephemeral: true });
-      return await showAdvMenu(interaction);
+      await showAdvMenu(interaction);
+      return await interaction.followUp({ content: `✅ Cargos para o nível Adv ${level} configurados!`, ephemeral: true });
     }
     
     if (payload.startsWith('farm_')) {
@@ -1218,8 +1218,8 @@ export async function handleInteraction(interaction) {
       const config = getGlobalFarmConfig() || { painelCanalId: '', categoriaId: '', cargosAdminIds: [] };
       config.cargosAdminIds = roleIds;
       saveGlobalFarmConfig(config);
-      await interaction.reply({ content: '✅ Cargos de gerenciamento de Farm salvos!', ephemeral: true });
-      return await showFarmMenu(interaction);
+      await showFarmMenu(interaction);
+      return await interaction.followUp({ content: '✅ Cargos de gerenciamento de Farm salvos!', ephemeral: true });
     }
     
     if (payload.startsWith('bau_create_')) {
@@ -1311,8 +1311,8 @@ export async function handleInteraction(interaction) {
         saveGlobalRecrutamentoConfig(config);
       }
       
-      await interaction.reply({ content: `✅ Cargos autorizados do módulo **${moduleName}** salvos!`, ephemeral: true });
-      return await showSimpleModuleMenu(interaction, moduleName);
+      await showSimpleModuleMenu(interaction, moduleName);
+      return await interaction.followUp({ content: `✅ Cargos autorizados do módulo **${moduleName}** salvos!`, ephemeral: true });
     }
   }
 }
