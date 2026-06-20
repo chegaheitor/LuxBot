@@ -128,7 +128,14 @@ export async function execute(interaction) {
       .setLabel('Baixar Banco de Dados')
       .setStyle(ButtonStyle.Secondary)
       .setEmoji('💾');
-    const rowBtns = new ActionRowBuilder().addComponents(btnDb);
+
+    const btnClearAll = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_clear_all_db')
+      .setLabel('Limpar Banco de Dados')
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji('💥');
+
+    const rowBtns = new ActionRowBuilder().addComponents(btnDb, btnClearAll);
 
     await interaction.reply({
       embeds: [embed],
@@ -203,7 +210,12 @@ export async function handleInteraction(interaction) {
         .setLabel('Baixar Banco de Dados')
         .setStyle(ButtonStyle.Secondary)
         .setEmoji('💾');
-      const rowBtns = new ActionRowBuilder().addComponents(btnDb);
+      const btnClearAll = new ButtonBuilder()
+        .setCustomId('painelconfig_btn_clear_all_db')
+        .setLabel('Limpar Banco de Dados')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('💥');
+      const rowBtns = new ActionRowBuilder().addComponents(btnDb, btnClearAll);
       return await interaction.update({ embeds: [embed], components: [row, rowBtns] });
     } catch (e) {
       console.error(e);
@@ -226,6 +238,78 @@ export async function handleInteraction(interaction) {
         content: '❌ Ocorreu um erro ao tentar exportar o banco de dados.',
         ephemeral: true
       });
+    }
+  }
+
+  if (interaction.isButton() && customId === 'painelconfig_btn_clear_all_db') {
+    const embedConfirm = new EmbedBuilder()
+      .setTitle('💥 PERIGO: APAGAR TODO O BANCO DE DADOS 💥')
+      .setDescription(
+        'Você está prestes a **APAGAR TOTALMENTE** o banco de dados do bot!\n' +
+        'Isso irá resetar todas as configurações de todos os módulos, deletar todas as fichas de membros, históricos de farm, ausências e baús cadastrados.\n\n' +
+        '**⚠️ ESTA AÇÃO É ABSOLUTAMENTE IRREVERSÍVEL!**'
+      )
+      .setColor(15548997)
+      .setTimestamp();
+
+    const btnConfirm = new ButtonBuilder()
+      .setCustomId('painelconfig_confirm_clear_all_db')
+      .setLabel('Sim, Apagar Tudo')
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji('💣');
+
+    const btnCancel = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_back')
+      .setLabel('Cancelar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('❌');
+
+    const row = new ActionRowBuilder().addComponents(btnConfirm, btnCancel);
+    return await interaction.update({ embeds: [embedConfirm], components: [row] });
+  }
+
+  if (interaction.isButton() && customId === 'painelconfig_confirm_clear_all_db') {
+    try {
+      const defaultBauItems = ['Ferro', 'Madeira', 'Armas', 'Munição', 'Kits', 'Dinheiro', 'Outros'];
+      saveDatabase({
+        paineis: [],
+        recrutas: [],
+        farmPaineis: [],
+        farmCanais: [],
+        logChannels: {},
+        vendaPaineis: [],
+        encomendaPaineis: [],
+        ausenciaPaineis: [],
+        baus: [],
+        bauItems: defaultBauItems,
+        advConfig: null
+      });
+
+      const embed = generateMainEmbed();
+      const row = generateMainRow();
+      const btnDb = new ButtonBuilder()
+        .setCustomId('painelconfig_btn_download_db')
+        .setLabel('Baixar Banco de Dados')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('💾');
+      const btnClearAll = new ButtonBuilder()
+        .setCustomId('painelconfig_btn_clear_all_db')
+        .setLabel('Limpar Banco de Dados')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('💥');
+      const rowBtns = new ActionRowBuilder().addComponents(btnDb, btnClearAll);
+
+      await interaction.update({ embeds: [embed], components: [row, rowBtns] });
+      return await interaction.followUp({
+        content: '💥 O banco de dados do LuxBot foi completamente deletado e resetado para os valores de fábrica!',
+        ephemeral: true
+      });
+    } catch (e) {
+      console.error('Erro ao limpar todo o banco de dados:', e);
+      return await interaction.reply({
+        content: '❌ Ocorreu um erro ao limpar o banco de dados.',
+        ephemeral: true
+      }).catch(() => null);
     }
   }
 
