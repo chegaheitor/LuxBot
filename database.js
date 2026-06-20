@@ -6,7 +6,7 @@ const DB_PATH = path.resolve('database.json');
 // Inicializa o banco de dados se o arquivo não existir
 export function initDatabase() {
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [] }, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [] }, null, 2));
   } else {
     try {
       const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
@@ -19,11 +19,12 @@ export function initDatabase() {
       if (!data.vendaPaineis) { data.vendaPaineis = []; modified = true; }
       if (!data.encomendaPaineis) { data.encomendaPaineis = []; modified = true; }
       if (!data.ausenciaPaineis) { data.ausenciaPaineis = []; modified = true; }
+      if (!data.baus) { data.baus = []; modified = true; }
       if (modified) {
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
       }
     } catch (e) {
-      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [] }, null, 2));
+      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [] }, null, 2));
     }
   }
 }
@@ -468,6 +469,27 @@ export function addMetaDeclarada(userId, tag, data) {
     });
     saveDatabase({ ...db, recrutas });
   }
+}
+
+// Salva a configuração de baú no banco
+export function saveBau(config) {
+  const db = getDatabase();
+  const baus = db.baus || [];
+  const index = baus.findIndex(b => b.messageId === config.messageId);
+
+  if (index !== -1) {
+    baus[index] = { ...baus[index], ...config, updatedAt: new Date().toISOString() };
+  } else {
+    baus.push({ ...config, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+  }
+
+  return saveDatabase({ ...db, baus });
+}
+
+// Obtém a configuração de baú pelo ID da mensagem
+export function getBau(messageId) {
+  const baus = getDatabase().baus || [];
+  return baus.find(b => b.messageId === messageId) || null;
 }
 
 
