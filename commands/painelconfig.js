@@ -40,6 +40,9 @@ import {
 } from '../database.js';
 import { sendLog } from '../logs.js';
 
+// Cache temporário para seleções de cargos no painel
+const tempSelections = new Map();
+
 // Importações dos criadores de painéis (serão renomeados)
 import { criarPainelFarm } from './criarfarm.js';
 import { criarPainelVenda } from './criarvenda.js';
@@ -522,7 +525,7 @@ export async function handleInteraction(interaction) {
         .setMaxValues(25);
 
       const btnSave = new ButtonBuilder()
-        .setCustomId(`painelconfig_save_adv_staff_${existingRoles.join('_')}`)
+        .setCustomId('painelconfig_save_adv_staff')
         .setLabel('Salvar Cargos')
         .setStyle(ButtonStyle.Success)
         .setEmoji('💾');
@@ -573,7 +576,7 @@ export async function handleInteraction(interaction) {
       .setMaxValues(25);
     
     const btnSave = new ButtonBuilder()
-      .setCustomId(`painelconfig_save_adv_cargo${level}_${existingRoles.join('_')}`)
+      .setCustomId(`painelconfig_save_adv_cargo${level}`)
       .setLabel('Salvar Cargos')
       .setStyle(ButtonStyle.Success)
       .setEmoji('💾');
@@ -658,7 +661,7 @@ export async function handleInteraction(interaction) {
         .setMaxValues(25);
 
       const btnSave = new ButtonBuilder()
-        .setCustomId(`painelconfig_save_farm_${existingRoles.join('_')}`)
+        .setCustomId('painelconfig_save_farm')
         .setLabel('Salvar Cargos')
         .setStyle(ButtonStyle.Success)
         .setEmoji('💾');
@@ -881,7 +884,7 @@ export async function handleInteraction(interaction) {
       .setMaxValues(25);
 
     const btnSave = new ButtonBuilder()
-      .setCustomId(`painelconfig_save_bau_create_${name}_${channelId}_`)
+      .setCustomId(`painelconfig_save_bau_create_${name}_${channelId}`)
       .setLabel('Salvar Cargos')
       .setStyle(ButtonStyle.Success)
       .setEmoji('💾');
@@ -1050,7 +1053,7 @@ export async function handleInteraction(interaction) {
         .setMaxValues(25);
 
       const btnSave = new ButtonBuilder()
-        .setCustomId(`painelconfig_save_simple_${moduleName}_${existingRoles.join('_')}`)
+        .setCustomId(`painelconfig_save_simple_${moduleName}`)
         .setLabel('Salvar Cargos')
         .setStyle(ButtonStyle.Success)
         .setEmoji('💾');
@@ -1146,15 +1149,22 @@ export async function handleInteraction(interaction) {
     const type = customId.replace('painelconfig_tempselect_', '');
     const rolesIds = interaction.values;
     
+    // Armazenar no cache temporário
+    const msgId = interaction.message.id;
+    if (!tempSelections.has(msgId)) {
+      tempSelections.set(msgId, {});
+    }
+    tempSelections.get(msgId)[type] = rolesIds;
+
     // Mostra a lista de cargos selecionados e o botão de salvar
     const cargosListStr = rolesIds.map(id => `<@&${id}>`).join(', ');
     
     // Criar o mesmo menu select novamente para que o usuário possa re-selecionar se quiser
     const originalSelect = RoleSelectMenuBuilder.from(interaction.component);
     
-    // Botão salvar
+    // Botão salvar (agora o customId é fixo e dinâmico na leitura via cache!)
     const btnSave = new ButtonBuilder()
-      .setCustomId(`painelconfig_save_${type}_${rolesIds.join('_')}`)
+      .setCustomId(`painelconfig_save_${type}`)
       .setLabel('Salvar Cargos')
       .setStyle(ButtonStyle.Success)
       .setEmoji('💾');
@@ -1192,42 +1202,63 @@ export async function handleInteraction(interaction) {
   // 2. Clique no botão de Salvar Cargos (grava no banco de dados)
   if (interaction.isButton() && customId.startsWith('painelconfig_save_')) {
     const payload = customId.replace('painelconfig_save_', '');
+    const msgId = interaction.message.id;
+    const tempRoles = tempSelections.get(msgId)?.[payload];
     
-    if (payload.startsWith('adv_staff_')) {
-      const roleIds = payload.replace('adv_staff_', '').split('_').filter(id => id);
+    if (payload === 'adv_staff') {
+      const roleIds = tempRoles || getAdvConfig()?.cargosStaffIds || [];
       const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Id: [], cargo2Id: [], cargo3Id: [], cargosStaffIds: [] };
       config.cargosStaffIds = roleIds;
       saveAdvConfig(config);
       await showAdvMenu(interaction);
+      
+      // Limpar cache temporário
+      if (tempSelections.has(msgId)) {
+        delete tempSelections.get(msgId)[payload];
+      }
       return await interaction.followUp({ content: '✅ Cargos de Staff autorizados para Adv salvos!', ephemeral: true });
     }
     
     if (payload.startsWith('adv_cargo')) {
-      // payload = adv_cargo1_role1_role2...
       const level = payload.charAt(9); // 1, 2, 3
-      const roleIds = payload.substring(11).split('_').filter(id => id);
+      const getRolesForLevel = (val) => {
+        if (!val) return [];
+        if (Array.isArray(val)) return val;
+        return [val];
+      };
+      const roleIds = tempRoles || getRolesForLevel(getAdvConfig()?.[`cargo${level}Id`]);
       const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Id: [], cargo2Id: [], cargo3Id: [], cargosStaffIds: [] };
       config[`cargo${level}Id`] = roleIds;
       saveAdvConfig(config);
       await showAdvMenu(interaction);
+      
+      // Limpar cache temporário
+      if (tempSelections.has(msgId)) {
+        delete tempSelections.get(msgId)[payload];
+      }
       return await interaction.followUp({ content: `✅ Cargos para o nível Adv ${level} configurados!`, ephemeral: true });
     }
     
-    if (payload.startsWith('farm_')) {
-      const roleIds = payload.replace('farm_', '').split('_').filter(id => id);
+    if (payload === 'farm') {
+      const roleIds = tempRoles || getGlobalFarmConfig()?.cargosAdminIds || [];
       const config = getGlobalFarmConfig() || { painelCanalId: '', categoriaId: '', cargosAdminIds: [] };
       config.cargosAdminIds = roleIds;
       saveGlobalFarmConfig(config);
       await showFarmMenu(interaction);
+      
+      // Limpar cache temporário
+      if (tempSelections.has(msgId)) {
+        delete tempSelections.get(msgId)[payload];
+      }
       return await interaction.followUp({ content: '✅ Cargos de gerenciamento de Farm salvos!', ephemeral: true });
     }
     
     if (payload.startsWith('bau_create_')) {
-      // payload = bau_create_Nome_canalId_role1_role2...
+      // payload = bau_create_Nome_canalId
       const parts = payload.replace('bau_create_', '').split('_');
       const name = parts[0];
       const channelId = parts[1];
-      const rolesIds = parts.slice(2).filter(id => id);
+      const rolesIds = tempRoles || [];
       
       if (rolesIds.length === 0) {
         return await interaction.reply({
@@ -1280,6 +1311,11 @@ export async function handleInteraction(interaction) {
           .setTimestamp();
 
         await sendLog(interaction.client, guild, 'listarbau', logEmbed);
+        
+        // Limpar cache temporário
+        if (tempSelections.has(msgId)) {
+          delete tempSelections.get(msgId)[payload];
+        }
       } catch (e) {
         console.error(e);
         await interaction.reply({ content: '❌ Erro ao instanciar o baú no canal.', ephemeral: true }).catch(() => null);
@@ -1288,10 +1324,20 @@ export async function handleInteraction(interaction) {
     }
     
     if (payload.startsWith('simple_')) {
-      // payload = simple_venda_role1_role2...
-      const parts = payload.replace('simple_', '').split('_');
-      const moduleName = parts[0];
-      const rolesIds = parts.slice(1).filter(id => id);
+      const moduleName = payload.replace('simple_', '');
+      
+      let existingRoles = [];
+      if (moduleName === 'venda') {
+        existingRoles = getGlobalVendaConfig()?.cargosPermitidosIds || [];
+      } else if (moduleName === 'encomenda') {
+        existingRoles = getGlobalEncomendaConfig()?.cargosPermitidosIds || [];
+      } else if (moduleName === 'ausencia') {
+        existingRoles = getGlobalAusenciaConfig()?.cargosPermitidosIds || [];
+      } else if (moduleName === 'recrutamento') {
+        existingRoles = getGlobalRecrutamentoConfig()?.cargosStaffIds || [];
+      }
+
+      const rolesIds = tempRoles || existingRoles;
       
       if (moduleName === 'venda') {
         const config = getGlobalVendaConfig() || { forumCanalId: '', cargosPermitidosIds: [] };
@@ -1312,6 +1358,11 @@ export async function handleInteraction(interaction) {
       }
       
       await showSimpleModuleMenu(interaction, moduleName);
+      
+      // Limpar cache temporário
+      if (tempSelections.has(msgId)) {
+        delete tempSelections.get(msgId)[payload];
+      }
       return await interaction.followUp({ content: `✅ Cargos autorizados do módulo **${moduleName}** salvos!`, ephemeral: true });
     }
   }
