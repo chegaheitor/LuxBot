@@ -164,6 +164,15 @@ client.on(Events.InteractionCreate, async interaction => {
         console.error('Erro ao processar interação do registrobau:', error);
       }
     }
+  } else if (customId.startsWith('configitemsbau_')) {
+    const command = client.commands.get('configitemsbau');
+    if (command && typeof command.handleInteraction === 'function') {
+      try {
+        await command.handleInteraction(interaction);
+      } catch (error) {
+        console.error('Erro ao processar interação do configitemsbau:', error);
+      }
+    }
   }
 });
 

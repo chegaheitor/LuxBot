@@ -5,8 +5,9 @@ const DB_PATH = path.resolve('database.json');
 
 // Inicializa o banco de dados se o arquivo não existir
 export function initDatabase() {
+  const defaultBauItems = ['Ferro', 'Madeira', 'Armas', 'Munição', 'Kits', 'Dinheiro', 'Outros'];
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [] }, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [], bauItems: defaultBauItems }, null, 2));
   } else {
     try {
       const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
@@ -20,11 +21,12 @@ export function initDatabase() {
       if (!data.encomendaPaineis) { data.encomendaPaineis = []; modified = true; }
       if (!data.ausenciaPaineis) { data.ausenciaPaineis = []; modified = true; }
       if (!data.baus) { data.baus = []; modified = true; }
+      if (!data.bauItems) { data.bauItems = defaultBauItems; modified = true; }
       if (modified) {
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
       }
     } catch (e) {
-      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [] }, null, 2));
+      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [], bauItems: defaultBauItems }, null, 2));
     }
   }
 }
@@ -490,6 +492,19 @@ export function saveBau(config) {
 export function getBau(messageId) {
   const baus = getDatabase().baus || [];
   return baus.find(b => b.messageId === messageId) || null;
+}
+
+// Salva a lista de itens customizados de baú
+export function saveBauItems(items) {
+  const db = getDatabase();
+  db.bauItems = items;
+  return saveDatabase(db);
+}
+
+// Retorna a lista de itens do baú
+export function getBauItems() {
+  const db = getDatabase();
+  return db.bauItems || ['Ferro', 'Madeira', 'Armas', 'Munição', 'Kits', 'Dinheiro', 'Outros'];
 }
 
 

@@ -11,7 +11,7 @@ import {
   StringSelectMenuBuilder, 
   ChannelType 
 } from 'discord.js';
-import { saveBau, getBau, getFarmMaterials } from '../database.js';
+import { saveBau, getBau, getBauItems } from '../database.js';
 import { sendLog } from '../logs.js';
 
 export const data = new SlashCommandBuilder()
@@ -99,6 +99,9 @@ export async function execute(interaction) {
       components: [row]
     });
 
+    // Fixar a mensagem principal no canal do baú
+    await msg.pin().catch(() => null);
+
     // Salvar baú inicializado no banco
     saveBau({
       messageId: msg.id,
@@ -166,7 +169,7 @@ export async function handleInteraction(interaction) {
 
       // Ação do Botão Adicionar
       if (customId === 'bau_adicionar_btn') {
-        const materials = getFarmMaterials();
+        const materials = getBauItems();
         
         const menu = new StringSelectMenuBuilder()
           .setCustomId(`bau_adicionar_select_${messageId}`)
