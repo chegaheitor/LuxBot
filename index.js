@@ -197,6 +197,15 @@ client.on(Events.InteractionCreate, async interaction => {
         console.error('Erro ao processar interação do adv:', error);
       }
     }
+  } else if (customId.startsWith('listarbau_')) {
+    const command = client.commands.get('listarbau');
+    if (command && typeof command.handleInteraction === 'function') {
+      try {
+        await command.handleInteraction(interaction);
+      } catch (error) {
+        console.error('Erro ao processar interação do listarbau:', error);
+      }
+    }
   }
 });
 
