@@ -23,6 +23,8 @@ import {
   deleteBau,
   getBauItems,
   saveBauItems,
+  getFarmMaterials,
+  saveFarmMaterials,
   getLogChannel,
   saveLogChannel,
   getGlobalVendaConfig,
@@ -49,10 +51,6 @@ export const data = new SlashCommandBuilder()
   .setName('painelconfig')
   .setDescription('Painel central de configurações do LuxBot.')
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
-
-// Armazena as seleções pendentes de confirmação antes de salvar no banco.
-// Chave: `${guildId}_${userId}`
-const pendingConfigs = new Map();
 
 // Helper para gerar o Embed Principal do Painel
 export function generateMainEmbed() {
@@ -144,7 +142,6 @@ export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
   const dataAtual = new Date().toLocaleDateString('pt-BR');
-  const key = `${interaction.guildId}_${interaction.user.id}`;
 
   // Restrição estrita de Administrador
   if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
@@ -191,7 +188,6 @@ export async function handleInteraction(interaction) {
   // 2. RETORNO AO MENU PRINCIPAL (BOTÃO VOLTAR)
   // ========================================================
   if (interaction.isButton() && customId === 'painelconfig_btn_back') {
-    pendingConfigs.delete(key);
     try {
       const embed = generateMainEmbed();
       const row = generateMainRow();
@@ -206,41 +202,55 @@ export async function handleInteraction(interaction) {
   // ========================================================
   if (interaction.isStringSelectMenu() && customId === 'painelconfig_logs_sel_cmd') {
     const commandName = interaction.values[0];
-    return await showLogsChannelSelect(interaction, commandName);
+    
+    const embed = new EmbedBuilder()
+      .setTitle(`📋 CONFIGURAR LOG: /${commandName.toUpperCase()} 📋`)
+      .setDescription(
+        `Selecione abaixo o canal de texto para onde os logs do comando **/${commandName}** serão enviados.\n\n` +
+        `Para desligar os logs deste comando, clique no botão **Desativar Log** abaixo.`
+      )
+      .setColor(3447003)
+      .setFooter({ text: `LuxBot Logs • ${dataAtual} • criado por chegaheitor` });
+
+    const channelSelect = new ChannelSelectMenuBuilder()
+      .setCustomId(`painelconfig_logs_channel_${commandName}`)
+      .setPlaceholder('Escolha o canal de logs...')
+      .addChannelTypes(ChannelType.GuildText);
+
+    const btnDisable = new ButtonBuilder()
+      .setCustomId(`painelconfig_logs_disable_${commandName}`)
+      .setLabel('Desativar Log')
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji('❌');
+
+    const btnVoltar = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_back_logs')
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+
+    const rowChan = new ActionRowBuilder().addComponents(channelSelect);
+    const rowBtns = new ActionRowBuilder().addComponents(btnDisable, btnVoltar);
+
+    return await interaction.update({ embeds: [embed], components: [rowChan, rowBtns] });
   }
 
   if (interaction.isChannelSelectMenu() && customId.startsWith('painelconfig_logs_channel_')) {
     const commandName = customId.replace('painelconfig_logs_channel_', '');
     const channelId = interaction.values[0];
-    pendingConfigs.set(key, { type: 'logs', commandName, channelId });
-
-    await interaction.deferUpdate();
-    return await showLogsChannelSelect(interaction, commandName);
-  }
-
-  if (interaction.isButton() && customId.startsWith('painelconfig_btn_confirm_logs_')) {
-    const commandName = customId.replace('painelconfig_btn_confirm_logs_', '');
-    const pending = pendingConfigs.get(key);
     
-    if (pending && pending.type === 'logs' && pending.commandName === commandName) {
-      saveLogChannel(commandName, pending.channelId);
-      pendingConfigs.delete(key);
-      await interaction.reply({
-        content: `✅ Logs do comando **/${commandName}** configurados com sucesso no canal <#${pending.channelId}>!`,
-        ephemeral: true
-      });
-    } else {
-      await interaction.reply({
-        content: `⚠️ Nenhuma alteração pendente encontrada.`,
-        ephemeral: true
-      });
-    }
+    saveLogChannel(commandName, channelId);
+
+    await interaction.reply({
+      content: `✅ Logs do comando **/${commandName}** associados com sucesso ao canal <#${channelId}>!`,
+      ephemeral: true
+    });
     return await showLogsMenu(interaction);
   }
 
   if (interaction.isButton() && customId.startsWith('painelconfig_logs_disable_')) {
     const commandName = customId.replace('painelconfig_logs_disable_', '');
-    pendingConfigs.delete(key);
+    
     saveLogChannel(commandName, null);
 
     await interaction.reply({
@@ -251,7 +261,6 @@ export async function handleInteraction(interaction) {
   }
 
   if (interaction.isButton() && customId === 'painelconfig_btn_back_logs') {
-    pendingConfigs.delete(key);
     return await showLogsMenu(interaction);
   }
 
@@ -261,16 +270,51 @@ export async function handleInteraction(interaction) {
   if (interaction.isButton() && customId.startsWith('painelconfig_btn_adv_')) {
     const action = customId.replace('painelconfig_btn_adv_', '');
 
+    const btnBack = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_back_adv')
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+    const rowBack = new ActionRowBuilder().addComponents(btnBack);
+
     if (action === 'ch_alertas') {
-      return await showAdvAlertsChannelSelect(interaction);
+      const select = new ChannelSelectMenuBuilder()
+        .setCustomId('painelconfig_selectchan_adv_alertas')
+        .setPlaceholder('Escolha o canal de alertas de Adv...')
+        .addChannelTypes(ChannelType.GuildText);
+      
+      const row = new ActionRowBuilder().addComponents(select);
+      return await interaction.update({
+        content: 'Selecione abaixo o canal onde serão publicados os avisos das advertências aplicadas:',
+        components: [row, rowBack]
+      });
     }
 
     if (action === 'ch_revocacoes') {
-      return await showAdvRevsChannelSelect(interaction);
+      const select = new ChannelSelectMenuBuilder()
+        .setCustomId('painelconfig_selectchan_adv_revocacoes')
+        .setPlaceholder('Escolha o canal de solicitações de revogação...')
+        .addChannelTypes(ChannelType.GuildText);
+      
+      const row = new ActionRowBuilder().addComponents(select);
+      return await interaction.update({
+        content: 'Selecione abaixo o canal onde a Staff receberá os pedidos de revogação das advertências:',
+        components: [row, rowBack]
+      });
     }
 
     if (action === 'staff') {
-      return await showAdvStaffSelect(interaction);
+      const select = new RoleSelectMenuBuilder()
+        .setCustomId('painelconfig_selectroles_adv_staff')
+        .setPlaceholder('Escolha os cargos autorizados a aplicar/remover Adv...')
+        .setMinValues(1)
+        .setMaxValues(4);
+      
+      const row = new ActionRowBuilder().addComponents(select);
+      return await interaction.update({
+        content: 'Selecione abaixo até 4 cargos de Staff permitidos a aplicar/revogar advertências:',
+        components: [row, rowBack]
+      });
     }
 
     if (action === 'cargos_adv') {
@@ -290,123 +334,46 @@ export async function handleInteraction(interaction) {
 
   if (interaction.isButton() && customId.startsWith('painelconfig_btn_adv_set_c')) {
     const level = customId.replace('painelconfig_btn_adv_set_c', '');
-    return await showAdvLevelSelect(interaction, level);
-  }
-
-  if (interaction.isButton() && customId === 'painelconfig_btn_back_adv') {
-    pendingConfigs.delete(key);
-    return await showAdvMenu(interaction);
-  }
-
-  if (interaction.isButton() && customId === 'painelconfig_btn_adv_cargos_adv') {
-    pendingConfigs.delete(key);
-    const btn1 = new ButtonBuilder().setCustomId('painelconfig_btn_adv_set_c1').setLabel('Definir Cargo Adv 1').setStyle(ButtonStyle.Primary);
-    const btn2 = new ButtonBuilder().setCustomId('painelconfig_btn_adv_set_c2').setLabel('Definir Cargo Adv 2').setStyle(ButtonStyle.Primary);
-    const btn3 = new ButtonBuilder().setCustomId('painelconfig_btn_adv_set_c3').setLabel('Definir Cargo Adv 3').setStyle(ButtonStyle.Primary);
-    const btnBackAdv = new ButtonBuilder().setCustomId('painelconfig_btn_back_adv').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
+    const select = new RoleSelectMenuBuilder()
+      .setCustomId(`painelconfig_selectrole_adv_cargo${level}`)
+      .setPlaceholder(`Selecione o cargo para Adv ${level}...`)
+      .setMinValues(1)
+      .setMaxValues(1);
     
-    const row = new ActionRowBuilder().addComponents(btn1, btn2, btn3, btnBackAdv);
-    return await updatePanel(interaction, {
-      content: 'Selecione qual cargo de advertência você quer configurar:',
-      embeds: [],
-      components: [row]
+    const btnBack = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_adv_cargos_adv')
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+    
+    const row = new ActionRowBuilder().addComponents(select);
+    const rowBack = new ActionRowBuilder().addComponents(btnBack);
+
+    return await interaction.update({
+      content: `Selecione o cargo correspondente ao acúmulo de **${level} advertência(s)** no servidor:`,
+      components: [row, rowBack]
     });
   }
 
-  // Tratar salvamentos de canais e cargos das advertências
-  if (interaction.isChannelSelectMenu() && customId === 'painelconfig_selectchan_adv_alertas') {
-    pendingConfigs.set(key, { type: 'adv_alertas', channelId: interaction.values[0] });
-    await interaction.deferUpdate();
-    return await showAdvAlertsChannelSelect(interaction);
+  if (interaction.isButton() && customId === 'painelconfig_btn_back_adv') {
+    return await showAdvMenu(interaction);
   }
 
-  if (interaction.isButton() && customId === 'painelconfig_btn_confirm_adv_alertas') {
-    const pending = pendingConfigs.get(key);
-    if (pending && pending.type === 'adv_alertas') {
-      const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Ids: [], cargo2Ids: [], cargo3Ids: [], cargosStaffIds: [] };
-      config.canalId = pending.channelId;
-      saveAdvConfig(config);
-      pendingConfigs.delete(key);
-      await interaction.reply({ content: '✅ Canal de alertas de advertências salvo com sucesso!', ephemeral: true });
-    } else {
-      await interaction.reply({ content: '⚠️ Nenhuma alteração pendente encontrada.', ephemeral: true });
-    }
+  // Tratar salvamentos de canais das advertências
+  if (interaction.isChannelSelectMenu() && customId === 'painelconfig_selectchan_adv_alertas') {
+    const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Id: '', cargo2Id: '', cargo3Id: '', cargosStaffIds: [] };
+    config.canalId = interaction.values[0];
+    saveAdvConfig(config);
+    await interaction.reply({ content: '✅ Canal de alertas de advertência updated!', ephemeral: true });
     return await showAdvMenu(interaction);
   }
 
   if (interaction.isChannelSelectMenu() && customId === 'painelconfig_selectchan_adv_revocacoes') {
-    pendingConfigs.set(key, { type: 'adv_revocacoes', channelId: interaction.values[0] });
-    await interaction.deferUpdate();
-    return await showAdvRevsChannelSelect(interaction);
-  }
-
-  if (interaction.isButton() && customId === 'painelconfig_btn_confirm_adv_revocacoes') {
-    const pending = pendingConfigs.get(key);
-    if (pending && pending.type === 'adv_revocacoes') {
-      const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Ids: [], cargo2Ids: [], cargo3Ids: [], cargosStaffIds: [] };
-      config.canalRevogacaoId = pending.channelId;
-      saveAdvConfig(config);
-      pendingConfigs.delete(key);
-      await interaction.reply({ content: '✅ Canal de solicitações de revogação salvo com sucesso!', ephemeral: true });
-    } else {
-      await interaction.reply({ content: '⚠️ Nenhuma alteração pendente encontrada.', ephemeral: true });
-    }
+    const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Id: '', cargo2Id: '', cargo3Id: '', cargosStaffIds: [] };
+    config.canalRevogacaoId = interaction.values[0];
+    saveAdvConfig(config);
+    await interaction.reply({ content: '✅ Canal de revogações de advertência updated!', ephemeral: true });
     return await showAdvMenu(interaction);
-  }
-
-  if (interaction.isRoleSelectMenu() && customId === 'painelconfig_selectroles_adv_staff') {
-    pendingConfigs.set(key, { type: 'adv_staff', roles: interaction.values });
-    await interaction.deferUpdate();
-    return await showAdvStaffSelect(interaction);
-  }
-
-  if (interaction.isButton() && customId === 'painelconfig_btn_confirm_adv_staff') {
-    const pending = pendingConfigs.get(key);
-    if (pending && pending.type === 'adv_staff') {
-      const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Ids: [], cargo2Ids: [], cargo3Ids: [], cargosStaffIds: [] };
-      config.cargosStaffIds = pending.roles;
-      saveAdvConfig(config);
-      pendingConfigs.delete(key);
-      await interaction.reply({ content: '✅ Cargos de Staff autorizados salvos com sucesso!', ephemeral: true });
-    } else {
-      await interaction.reply({ content: '⚠️ Nenhuma alteração pendente encontrada.', ephemeral: true });
-    }
-    return await showAdvMenu(interaction);
-  }
-
-  if (interaction.isRoleSelectMenu() && customId.startsWith('painelconfig_selectrole_adv_cargo')) {
-    const level = customId.replace('painelconfig_selectrole_adv_cargo', '');
-    pendingConfigs.set(key, { type: `adv_cargo_${level}`, level, roles: interaction.values });
-    await interaction.deferUpdate();
-    return await showAdvLevelSelect(interaction, level);
-  }
-
-  if (interaction.isButton() && customId.startsWith('painelconfig_btn_confirm_adv_cargo_')) {
-    const level = customId.replace('painelconfig_btn_confirm_adv_cargo_', '');
-    const pending = pendingConfigs.get(key);
-    
-    if (pending && pending.type === `adv_cargo_${level}`) {
-      const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Ids: [], cargo2Ids: [], cargo3Ids: [], cargosStaffIds: [] };
-      config[`cargo${level}Ids`] = pending.roles;
-      delete config[`cargo${level}Id`];
-      saveAdvConfig(config);
-      pendingConfigs.delete(key);
-      await interaction.reply({ content: `✅ Cargos do nível Adv ${level} salvos com sucesso!`, ephemeral: true });
-    } else {
-      await interaction.reply({ content: '⚠️ Nenhuma alteração pendente encontrada.', ephemeral: true });
-    }
-    
-    const btn1 = new ButtonBuilder().setCustomId('painelconfig_btn_adv_set_c1').setLabel('Definir Cargo Adv 1').setStyle(ButtonStyle.Primary);
-    const btn2 = new ButtonBuilder().setCustomId('painelconfig_btn_adv_set_c2').setLabel('Definir Cargo Adv 2').setStyle(ButtonStyle.Primary);
-    const btn3 = new ButtonBuilder().setCustomId('painelconfig_btn_adv_set_c3').setLabel('Definir Cargo Adv 3').setStyle(ButtonStyle.Primary);
-    const btnBackAdv = new ButtonBuilder().setCustomId('painelconfig_btn_back_adv').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
-    
-    const row = new ActionRowBuilder().addComponents(btn1, btn2, btn3, btnBackAdv);
-    return await updatePanel(interaction, {
-      content: 'Selecione qual cargo de advertência você quer configurar:',
-      embeds: [],
-      components: [row]
-    });
   }
 
   // ========================================================
@@ -415,12 +382,45 @@ export async function handleInteraction(interaction) {
   if (interaction.isButton() && customId.startsWith('painelconfig_btn_farm_')) {
     const action = customId.replace('painelconfig_btn_farm_', '');
 
+    const btnBack = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_back_farm')
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+    const rowBack = new ActionRowBuilder().addComponents(btnBack);
+
     if (action === 'channels') {
-      return await showFarmChannelsSelect(interaction);
+      const selectPanel = new ChannelSelectMenuBuilder()
+        .setCustomId('painelconfig_selectchan_farm_panel')
+        .setPlaceholder('Escolha o canal onde ficará o Painel de Farm...')
+        .addChannelTypes(ChannelType.GuildText);
+
+      const selectCat = new ChannelSelectMenuBuilder()
+        .setCustomId('painelconfig_selectchan_farm_category')
+        .setPlaceholder('Escolha a categoria dos canais de farm dos membros...')
+        .addChannelTypes(ChannelType.GuildCategory);
+
+      const rowP = new ActionRowBuilder().addComponents(selectPanel);
+      const rowC = new ActionRowBuilder().addComponents(selectCat);
+
+      return await interaction.update({
+        content: 'Configure abaixo o canal do painel e a categoria correspondente de farm:',
+        components: [rowP, rowC, rowBack]
+      });
     }
 
     if (action === 'roles') {
-      return await showFarmRolesSelect(interaction);
+      const select = new RoleSelectMenuBuilder()
+        .setCustomId('painelconfig_selectroles_farm')
+        .setPlaceholder('Escolha os cargos autorizados a gerenciar metas e farms...')
+        .setMinValues(1)
+        .setMaxValues(3);
+      
+      const row = new ActionRowBuilder().addComponents(select);
+      return await interaction.update({
+        content: 'Selecione abaixo até 3 cargos autorizados a gerenciar as metas e canais de farm:',
+        components: [row, rowBack]
+      });
     }
 
     if (action === 'materials') {
@@ -463,27 +463,6 @@ export async function handleInteraction(interaction) {
   }
 
   if (interaction.isButton() && customId === 'painelconfig_btn_back_farm') {
-    pendingConfigs.delete(key);
-    return await showFarmMenu(interaction);
-  }
-
-  if (interaction.isRoleSelectMenu() && customId === 'painelconfig_selectroles_farm') {
-    pendingConfigs.set(key, { type: 'farm_roles', roles: interaction.values });
-    await interaction.deferUpdate();
-    return await showFarmRolesSelect(interaction);
-  }
-
-  if (interaction.isButton() && customId === 'painelconfig_btn_confirm_farm_roles') {
-    const pending = pendingConfigs.get(key);
-    if (pending && pending.type === 'farm_roles') {
-      const config = getGlobalFarmConfig() || { painelCanalId: '', categoriaId: '', cargosAdminIds: [] };
-      config.cargosAdminIds = pending.roles;
-      saveGlobalFarmConfig(config);
-      pendingConfigs.delete(key);
-      await interaction.reply({ content: '✅ Cargos de gerenciamento de Farm salvos com sucesso!', ephemeral: true });
-    } else {
-      await interaction.reply({ content: '⚠️ Nenhuma alteração pendente encontrada.', ephemeral: true });
-    }
     return await showFarmMenu(interaction);
   }
 
@@ -558,35 +537,18 @@ export async function handleInteraction(interaction) {
 
   // Canais de Farm selecionados
   if (interaction.isChannelSelectMenu() && customId === 'painelconfig_selectchan_farm_panel') {
-    const pending = pendingConfigs.get(key) || { type: 'farm_channels' };
-    pending.painelCanalId = interaction.values[0];
-    pendingConfigs.set(key, pending);
-
-    await interaction.deferUpdate();
-    return await showFarmChannelsSelect(interaction);
+    const config = getGlobalFarmConfig() || { painelCanalId: '', categoriaId: '', cargosAdminIds: [] };
+    config.painelCanalId = interaction.values[0];
+    saveGlobalFarmConfig(config);
+    await interaction.reply({ content: '✅ Canal do Painel de Farm atualizado!', ephemeral: true });
+    return await showFarmMenu(interaction);
   }
 
   if (interaction.isChannelSelectMenu() && customId === 'painelconfig_selectchan_farm_category') {
-    const pending = pendingConfigs.get(key) || { type: 'farm_channels' };
-    pending.categoriaId = interaction.values[0];
-    pendingConfigs.set(key, pending);
-
-    await interaction.deferUpdate();
-    return await showFarmChannelsSelect(interaction);
-  }
-
-  if (interaction.isButton() && customId === 'painelconfig_btn_confirm_farm_channels') {
-    const pending = pendingConfigs.get(key);
-    if (pending && pending.type === 'farm_channels') {
-      const config = getGlobalFarmConfig() || { painelCanalId: '', categoriaId: '', cargosAdminIds: [] };
-      if (pending.painelCanalId) config.painelCanalId = pending.painelCanalId;
-      if (pending.categoriaId) config.categoriaId = pending.categoriaId;
-      saveGlobalFarmConfig(config);
-      pendingConfigs.delete(key);
-      await interaction.reply({ content: '✅ Canais de Farm salvos com sucesso!', ephemeral: true });
-    } else {
-      await interaction.reply({ content: '⚠️ Nenhuma alteração pendente encontrada.', ephemeral: true });
-    }
+    const config = getGlobalFarmConfig() || { painelCanalId: '', categoriaId: '', cargosAdminIds: [] };
+    config.categoriaId = interaction.values[0];
+    saveGlobalFarmConfig(config);
+    await interaction.reply({ content: '✅ Categoria de canais de Farm atualizada!', ephemeral: true });
     return await showFarmMenu(interaction);
   }
 
@@ -627,7 +589,6 @@ export async function handleInteraction(interaction) {
   }
 
   if (interaction.isButton() && customId === 'painelconfig_btn_back_bau') {
-    pendingConfigs.delete(key);
     return await showBauMenu(interaction);
   }
 
@@ -679,77 +640,7 @@ export async function handleInteraction(interaction) {
     });
   }
 
-  if (interaction.isRoleSelectMenu() && customId.startsWith('painelconfig_selectroles_bau_create_')) {
-    const parts = customId.replace('painelconfig_selectroles_bau_create_', '').split('_');
-    const name = parts[0];
-    const channelId = parts[1];
-    
-    pendingConfigs.set(key, { type: 'bau_create', name, channelId, roles: interaction.values });
-    await interaction.deferUpdate();
-    return await showBauCreateRolesSelect(interaction, name, channelId);
-  }
 
-  if (interaction.isButton() && customId === 'painelconfig_btn_confirm_bau_create') {
-    const pending = pendingConfigs.get(key);
-    if (pending && pending.type === 'bau_create') {
-      try {
-        const { name, channelId, roles } = pending;
-
-        const channel = await guild.channels.fetch(channelId).catch(() => null);
-        if (!channel) {
-          return await interaction.reply({ content: '❌ Canal do baú não localizado!', ephemeral: true });
-        }
-
-        // Criar a mensagem do Baú no canal
-        const welcomeEmbed = new EmbedBuilder()
-          .setTitle(`📦 BAÚ: ${name.toUpperCase()} 📦`)
-          .setDescription('**Conteúdo do Baú:**\n*Nenhum item armazenado no momento.*')
-          .setColor(12096338) // Madeira
-          .setFooter({ text: `LuxBot Baú • ${dataAtual} • criado por chegaheitor` })
-          .setTimestamp();
-
-        const btnAdd = new ButtonBuilder().setCustomId('bau_adicionar_btn').setLabel('Adicionar').setStyle(ButtonStyle.Primary).setEmoji('📥');
-        const btnRemove = new ButtonBuilder().setCustomId('bau_retirar_btn').setLabel('Retirar').setStyle(ButtonStyle.Secondary).setEmoji('📤');
-        const row = new ActionRowBuilder().addComponents(btnAdd, btnRemove);
-
-        const msg = await channel.send({ embeds: [welcomeEmbed], components: [row] });
-        await msg.pin().catch(() => null);
-
-        // Salvar baú no banco
-        saveBau({
-          messageId: msg.id,
-          canalId: channelId,
-          nome: name,
-          cargosPermitidosIds: roles,
-          itens: {}
-        });
-
-        pendingConfigs.delete(key);
-
-        await interaction.update({
-          content: `✅ O baú **${name}** foi criado com sucesso no canal <#${channelId}>!`,
-          components: []
-        });
-
-        // Log de Baú Criado
-        const logEmbed = new EmbedBuilder()
-          .setTitle('⚙️ Baú Criado')
-          .setColor(3066993)
-          .setDescription(`O administrador <@${interaction.user.id}> criou o baú **${name}** em <#${channelId}>.`)
-          .addFields({ name: '💼 Cargos Autorizados:', value: roles.map(id => `<@&${id}>`).join(', ') })
-          .setTimestamp();
-
-        await sendLog(interaction.client, guild, 'listarbau', logEmbed);
-
-      } catch (e) {
-        console.error(e);
-        await interaction.reply({ content: '❌ Erro ao instanciar o baú no canal.', ephemeral: true }).catch(() => null);
-      }
-    } else {
-      await interaction.reply({ content: '⚠️ Nenhuma alteração pendente encontrada.', ephemeral: true });
-    }
-    return;
-  }
 
   // Itens Globais do Baú (Adicionar/Remover)
   if (interaction.isButton() && customId === 'painelconfig_btn_bau_items_add') {
@@ -828,12 +719,70 @@ export async function handleInteraction(interaction) {
     const action = parts[0];
     const moduleName = parts[1];
 
+    const btnBack = new ButtonBuilder()
+      .setCustomId(`painelconfig_btn_back_simple_${moduleName}`)
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+    const rowBack = new ActionRowBuilder().addComponents(btnBack);
+
+    // Alterar canais de fluxo simples
     if (action === 'channels') {
-      return await showSimpleModuleChannelsSelect(interaction, moduleName);
+      if (moduleName === 'recrutamento') {
+        const selectWelcome = new ChannelSelectMenuBuilder()
+          .setCustomId('painelconfig_selectchan_simple_recrutamento_welcome')
+          .setPlaceholder('Canal do Painel (Bem-vindo)...')
+          .addChannelTypes(ChannelType.GuildText);
+
+        const selectPedidos = new ChannelSelectMenuBuilder()
+          .setCustomId('painelconfig_selectchan_simple_recrutamento_pedidos')
+          .setPlaceholder('Canal de Pedidos (Inscrições Staff)...')
+          .addChannelTypes(ChannelType.GuildText);
+
+        const selectLogs = new ChannelSelectMenuBuilder()
+          .setCustomId('painelconfig_selectchan_simple_recrutamento_logs')
+          .setPlaceholder('Canal de Logs Negados...')
+          .addChannelTypes(ChannelType.GuildText);
+
+        return await interaction.update({
+          content: 'Selecione abaixo os 3 canais de texto para o recrutamento:',
+          components: [
+            new ActionRowBuilder().addComponents(selectWelcome),
+            new ActionRowBuilder().addComponents(selectPedidos),
+            new ActionRowBuilder().addComponents(selectLogs),
+            rowBack
+          ]
+        });
+      } else {
+        const isForum = ['venda', 'encomenda'].includes(moduleName);
+        const channelTypes = isForum ? [ChannelType.GuildForum] : [ChannelType.GuildText];
+        
+        const select = new ChannelSelectMenuBuilder()
+          .setCustomId(`painelconfig_selectchan_simple_${moduleName}`)
+          .setPlaceholder(`Selecione o canal para ${moduleName}...`)
+          .addChannelTypes(channelTypes);
+
+        const row = new ActionRowBuilder().addComponents(select);
+        return await interaction.update({
+          content: `Selecione abaixo o canal/fórum correspondente ao módulo **${moduleName}**:`,
+          components: [row, rowBack]
+        });
+      }
     }
 
+    // Alterar cargos de fluxo simples
     if (action === 'roles') {
-      return await showSimpleModuleRolesSelect(interaction, moduleName);
+      const select = new RoleSelectMenuBuilder()
+        .setCustomId(`painelconfig_selectroles_simple_${moduleName}`)
+        .setPlaceholder(`Selecione os cargos para ${moduleName}...`)
+        .setMinValues(1)
+        .setMaxValues(5);
+
+      const row = new ActionRowBuilder().addComponents(select);
+      return await interaction.update({
+        content: `Selecione abaixo até 5 cargos permitidos para o módulo **${moduleName}**:`,
+        components: [row, rowBack]
+      });
     }
 
     // Criar Painel
@@ -863,7 +812,6 @@ export async function handleInteraction(interaction) {
   // Retorno de módulos simples
   if (interaction.isButton() && customId.startsWith('painelconfig_btn_back_simple_')) {
     const moduleName = customId.replace('painelconfig_btn_back_simple_', '');
-    pendingConfigs.delete(key);
     return await showSimpleModuleMenu(interaction, moduleName);
   }
 
@@ -873,567 +821,214 @@ export async function handleInteraction(interaction) {
 
     if (detail.startsWith('recrutamento_')) {
       const channelType = detail.replace('recrutamento_', '');
-      const pending = pendingConfigs.get(key) || { type: 'simple_channels_recrutamento' };
+      const config = getGlobalRecrutamentoConfig() || { canalPainelId: '', canalPedidosId: '', canalLogsNegadoId: '', cargosStaffIds: [] };
       
-      if (channelType === 'welcome') pending.welcome = interaction.values[0];
-      if (channelType === 'pedidos') pending.pedidos = interaction.values[0];
-      if (channelType === 'logs') pending.logs = interaction.values[0];
+      if (channelType === 'welcome') config.canalPainelId = interaction.values[0];
+      if (channelType === 'pedidos') config.canalPedidosId = interaction.values[0];
+      if (channelType === 'logs') config.canalLogsNegadoId = interaction.values[0];
 
-      pendingConfigs.set(key, pending);
-      await interaction.deferUpdate();
-      return await showSimpleModuleChannelsSelect(interaction, 'recrutamento');
+      saveGlobalRecrutamentoConfig(config);
+      await interaction.reply({ content: `✅ Canal de recrutamento (${channelType}) salvo com sucesso!`, ephemeral: true });
+      return await showSimpleModuleMenu(interaction, 'recrutamento');
     } else {
       const moduleName = detail;
       const channelId = interaction.values[0];
-      pendingConfigs.set(key, { type: `simple_channels_${moduleName}`, moduleName, channelId });
 
-      await interaction.deferUpdate();
-      return await showSimpleModuleChannelsSelect(interaction, moduleName);
-    }
-  }
-
-  if (interaction.isButton() && customId.startsWith('painelconfig_btn_confirm_simple_channels_')) {
-    const moduleName = customId.replace('painelconfig_btn_confirm_simple_channels_', '');
-    const pending = pendingConfigs.get(key);
-    
-    if (pending && pending.type === `simple_channels_${moduleName}`) {
-      if (moduleName === 'recrutamento') {
-        const config = getGlobalRecrutamentoConfig() || { canalPainelId: '', canalPedidosId: '', canalLogsNegadoId: '', cargosStaffIds: [] };
-        if (pending.welcome) config.canalPainelId = pending.welcome;
-        if (pending.pedidos) config.canalPedidosId = pending.pedidos;
-        if (pending.logs) config.canalLogsNegadoId = pending.logs;
-        saveGlobalRecrutamentoConfig(config);
-      } else {
-        const channelId = pending.channelId;
-        if (moduleName === 'venda') {
-          const config = getGlobalVendaConfig() || { forumCanalId: '', cargosPermitidosIds: [] };
-          config.forumCanalId = channelId;
-          saveGlobalVendaConfig(config);
-        } else if (moduleName === 'encomenda') {
-          const config = getGlobalEncomendaConfig() || { forumCanalId: '', cargosPermitidosIds: [] };
-          config.forumCanalId = channelId;
-          saveGlobalEncomendaConfig(config);
-        } else if (moduleName === 'ausencia') {
-          const config = getGlobalAusenciaConfig() || { canalId: '', cargosPermitidosIds: [] };
-          config.canalId = channelId;
-          saveGlobalAusenciaConfig(config);
-        }
-      }
-      pendingConfigs.delete(key);
-      await interaction.reply({ content: `✅ Canais do módulo **${moduleName}** salvos com sucesso!`, ephemeral: true });
-    } else {
-      await interaction.reply({ content: '⚠️ Nenhuma alteração pendente encontrada.', ephemeral: true });
-    }
-    return await showSimpleModuleMenu(interaction, moduleName);
-  }
-
-  // Tratar seleções de cargos para módulos simples
-  if (interaction.isRoleSelectMenu() && customId.startsWith('painelconfig_selectroles_simple_')) {
-    const moduleName = customId.replace('painelconfig_selectroles_simple_', '');
-    pendingConfigs.set(key, { type: `simple_roles_${moduleName}`, moduleName, roles: interaction.values });
-
-    await interaction.deferUpdate();
-    return await showSimpleModuleRolesSelect(interaction, moduleName);
-  }
-
-  if (interaction.isButton() && customId.startsWith('painelconfig_btn_confirm_simple_roles_')) {
-    const moduleName = customId.replace('painelconfig_btn_confirm_simple_roles_', '');
-    const pending = pendingConfigs.get(key);
-    
-    if (pending && pending.type === `simple_roles_${moduleName}`) {
       if (moduleName === 'venda') {
         const config = getGlobalVendaConfig() || { forumCanalId: '', cargosPermitidosIds: [] };
-        config.cargosPermitidosIds = pending.roles;
+        config.forumCanalId = channelId;
         saveGlobalVendaConfig(config);
       } else if (moduleName === 'encomenda') {
         const config = getGlobalEncomendaConfig() || { forumCanalId: '', cargosPermitidosIds: [] };
-        config.cargosPermitidosIds = pending.roles;
+        config.forumCanalId = channelId;
         saveGlobalEncomendaConfig(config);
       } else if (moduleName === 'ausencia') {
         const config = getGlobalAusenciaConfig() || { canalId: '', cargosPermitidosIds: [] };
-        config.cargosPermitidosIds = pending.roles;
+        config.canalId = channelId;
+        saveGlobalAusenciaConfig(config);
+      }
+
+      await interaction.reply({ content: `✅ Canal do módulo **${moduleName}** atualizado!`, ephemeral: true });
+      return await showSimpleModuleMenu(interaction, moduleName);
+    }
+  }
+
+  // ========================================================
+  // TRATAMENTO DE SELEÇÃO TEMPORÁRIA E CONFIRMAÇÃO DE CARGOS
+  // ========================================================
+
+  // 1. Seleção temporária de cargos (não grava no banco imediatamente)
+  if (interaction.isRoleSelectMenu() && customId.startsWith('painelconfig_tempselect_')) {
+    const type = customId.replace('painelconfig_tempselect_', '');
+    const rolesIds = interaction.values;
+    
+    // Mostra a lista de cargos selecionados e o botão de salvar
+    const cargosListStr = rolesIds.map(id => `<@&${id}>`).join(', ');
+    
+    // Criar o mesmo menu select novamente para que o usuário possa re-selecionar se quiser
+    const originalSelect = RoleSelectMenuBuilder.from(interaction.component);
+    
+    // Botão salvar
+    const btnSave = new ButtonBuilder()
+      .setCustomId(`painelconfig_save_${type}_${rolesIds.join('_')}`)
+      .setLabel('Salvar Cargos')
+      .setStyle(ButtonStyle.Success)
+      .setEmoji('💾');
+      
+    // Botão Voltar (precisa ser dinâmico dependendo de onde viemos)
+    let backCustomId = 'painelconfig_btn_back';
+    if (type.startsWith('adv_cargo')) {
+      backCustomId = 'painelconfig_btn_adv_cargos_adv';
+    } else if (type === 'adv_staff') {
+      backCustomId = 'painelconfig_btn_back_adv';
+    } else if (type === 'farm') {
+      backCustomId = 'painelconfig_btn_back_farm';
+    } else if (type.startsWith('bau_create_')) {
+      backCustomId = 'painelconfig_btn_back_bau';
+    } else if (type.startsWith('simple_')) {
+      const mod = type.replace('simple_', '');
+      backCustomId = `painelconfig_btn_back_simple_${mod}`;
+    }
+    
+    const btnBack = new ButtonBuilder()
+      .setCustomId(backCustomId)
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+      
+    const rowSelect = new ActionRowBuilder().addComponents(originalSelect);
+    const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
+    
+    return await interaction.update({
+      content: `**⚠️ Cargos selecionados para configurar:**\n${cargosListStr}\n\nClique em **Salvar Cargos** para confirmar a alteração no banco de dados.`,
+      components: [rowSelect, rowBtns]
+    });
+  }
+
+  // 2. Clique no botão de Salvar Cargos (grava no banco de dados)
+  if (interaction.isButton() && customId.startsWith('painelconfig_save_')) {
+    const payload = customId.replace('painelconfig_save_', '');
+    
+    if (payload.startsWith('adv_staff_')) {
+      const roleIds = payload.replace('adv_staff_', '').split('_');
+      const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Id: [], cargo2Id: [], cargo3Id: [], cargosStaffIds: [] };
+      config.cargosStaffIds = roleIds;
+      saveAdvConfig(config);
+      await interaction.reply({ content: '✅ Cargos de Staff autorizados para Adv salvos!', ephemeral: true });
+      return await showAdvMenu(interaction);
+    }
+    
+    if (payload.startsWith('adv_cargo')) {
+      // payload = adv_cargo1_role1_role2...
+      const level = payload.charAt(9); // 1, 2, 3
+      const roleIds = payload.substring(11).split('_');
+      const config = getAdvConfig() || { canalId: '', canalRevogacaoId: '', cargo1Id: [], cargo2Id: [], cargo3Id: [], cargosStaffIds: [] };
+      config[`cargo${level}Id`] = roleIds;
+      saveAdvConfig(config);
+      await interaction.reply({ content: `✅ Cargos para o nível Adv ${level} configurados!`, ephemeral: true });
+      return await showAdvMenu(interaction);
+    }
+    
+    if (payload.startsWith('farm_')) {
+      const roleIds = payload.replace('farm_', '').split('_');
+      const config = getGlobalFarmConfig() || { painelCanalId: '', categoriaId: '', cargosAdminIds: [] };
+      config.cargosAdminIds = roleIds;
+      saveGlobalFarmConfig(config);
+      await interaction.reply({ content: '✅ Cargos de gerenciamento de Farm salvos!', ephemeral: true });
+      return await showFarmMenu(interaction);
+    }
+    
+    if (payload.startsWith('bau_create_')) {
+      // payload = bau_create_Nome_canalId_role1_role2...
+      const parts = payload.replace('bau_create_', '').split('_');
+      const name = parts[0];
+      const channelId = parts[1];
+      const rolesIds = parts.slice(2);
+      
+      try {
+        const channel = await guild.channels.fetch(channelId).catch(() => null);
+        if (!channel) {
+          return await interaction.reply({ content: '❌ Canal do baú não localizado!', ephemeral: true });
+        }
+
+        // Criar a mensagem do Baú no canal
+        const welcomeEmbed = new EmbedBuilder()
+          .setTitle(`📦 BAÚ: ${name.toUpperCase()} 📦`)
+          .setDescription('**Conteúdo do Baú:**\n*Nenhum item armazenado no momento.*')
+          .setColor(12096338) // Madeira
+          .setFooter({ text: `LuxBot Baú • ${dataAtual} • criado por chegaheitor` })
+          .setTimestamp();
+
+        const btnAdd = new ButtonBuilder().setCustomId('bau_adicionar_btn').setLabel('Adicionar').setStyle(ButtonStyle.Primary).setEmoji('📥');
+        const btnRemove = new ButtonBuilder().setCustomId('bau_retirar_btn').setLabel('Retirar').setStyle(ButtonStyle.Secondary).setEmoji('📤');
+        const row = new ActionRowBuilder().addComponents(btnAdd, btnRemove);
+
+        const msg = await channel.send({ embeds: [welcomeEmbed], components: [row] });
+        await msg.pin().catch(() => null);
+
+        // Salvar baú no banco
+        saveBau({
+          messageId: msg.id,
+          canalId: channelId,
+          nome: name,
+          cargosPermitidosIds: rolesIds,
+          itens: {}
+        });
+
+        await interaction.update({
+          content: `✅ O baú **${name}** foi criado com sucesso no canal <#${channelId}>!`,
+          components: []
+        });
+
+        // Log de Baú Criado
+        const logEmbed = new EmbedBuilder()
+          .setTitle('⚙️ Baú Criado')
+          .setColor(3066993)
+          .setDescription(`O administrador <@${interaction.user.id}> criou o baú **${name}** em <#${channelId}>.`)
+          .addFields({ name: '💼 Cargos Autorizados:', value: rolesIds.map(id => `<@&${id}>`).join(', ') })
+          .setTimestamp();
+
+        await sendLog(interaction.client, guild, 'listarbau', logEmbed);
+      } catch (e) {
+        console.error(e);
+        await interaction.reply({ content: '❌ Erro ao instanciar o baú no canal.', ephemeral: true }).catch(() => null);
+      }
+      return;
+    }
+    
+    if (payload.startsWith('simple_')) {
+      // payload = simple_venda_role1_role2...
+      const parts = payload.replace('simple_', '').split('_');
+      const moduleName = parts[0];
+      const rolesIds = parts.slice(1);
+      
+      if (moduleName === 'venda') {
+        const config = getGlobalVendaConfig() || { forumCanalId: '', cargosPermitidosIds: [] };
+        config.cargosPermitidosIds = rolesIds;
+        saveGlobalVendaConfig(config);
+      } else if (moduleName === 'encomenda') {
+        const config = getGlobalEncomendaConfig() || { forumCanalId: '', cargosPermitidosIds: [] };
+        config.cargosPermitidosIds = rolesIds;
+        saveGlobalEncomendaConfig(config);
+      } else if (moduleName === 'ausencia') {
+        const config = getGlobalAusenciaConfig() || { canalId: '', cargosPermitidosIds: [] };
+        config.cargosPermitidosIds = rolesIds;
         saveGlobalAusenciaConfig(config);
       } else if (moduleName === 'recrutamento') {
         const config = getGlobalRecrutamentoConfig() || { canalPainelId: '', canalPedidosId: '', canalLogsNegadoId: '', cargosStaffIds: [] };
-        config.cargosStaffIds = pending.roles;
+        config.cargosStaffIds = rolesIds;
         saveGlobalRecrutamentoConfig(config);
       }
-      pendingConfigs.delete(key);
-      await interaction.reply({ content: `✅ Cargos autorizados do módulo **${moduleName}** salvos com sucesso!`, ephemeral: true });
-    } else {
-      await interaction.reply({ content: '⚠️ Nenhuma alteração pendente encontrada.', ephemeral: true });
+      
+      await interaction.reply({ content: `✅ Cargos autorizados do módulo **${moduleName}** salvos!`, ephemeral: true });
+      return await showSimpleModuleMenu(interaction, moduleName);
     }
-    return await showSimpleModuleMenu(interaction, moduleName);
   }
 }
 
 // ========================================================
 // FUNÇÕES AUXILIARES DE RENDERIZAÇÃO DE MENUS
 // ========================================================
-
-// Helper para atualizar a mensagem do painel de forma flexível (com ou sem ephemeral)
-async function updatePanel(interaction, options) {
-  try {
-    if (interaction.replied || interaction.deferred) {
-      return await interaction.message.edit(options);
-    } else {
-      return await interaction.update(options);
-    }
-  } catch (error) {
-    console.error('Erro ao atualizar painel:', error);
-  }
-}
-
-// Helper para renderizar seleção de cargos de staff de Adv
-async function showAdvStaffSelect(interaction) {
-  const adv = getAdvConfig();
-  const key = `${interaction.guildId}_${interaction.user.id}`;
-  const pending = pendingConfigs.get(key);
-
-  let roles = adv?.cargosStaffIds || [];
-  let isPending = false;
-  if (pending && pending.type === 'adv_staff') {
-    roles = pending.roles;
-    isPending = true;
-  }
-
-  const staffsText = roles.length > 0
-    ? roles.map(id => `<@&${id}>`).join(', ') + (isPending ? ' ⚠️ *(Pendente de Confirmação)*' : '')
-    : '❌ *Não Configurado*';
-
-  const select = new RoleSelectMenuBuilder()
-    .setCustomId('painelconfig_selectroles_adv_staff')
-    .setPlaceholder('Escolha os cargos autorizados a aplicar/remover Adv...')
-    .setMinValues(1)
-    .setMaxValues(4);
-  
-  const btnConfirm = new ButtonBuilder().setCustomId('painelconfig_btn_confirm_adv_staff').setLabel('Confirmar').setStyle(ButtonStyle.Success).setEmoji('✅');
-  const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back_adv').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
-
-  const row = new ActionRowBuilder().addComponents(select);
-  const rowBtns = new ActionRowBuilder().addComponents(btnConfirm, btnVoltar);
-
-  return await updatePanel(interaction, {
-    content: `Selecione abaixo até 4 cargos de Staff permitidos a aplicar/revogar advertências:\n\n• **Cargos Selecionados:** ${staffsText}`,
-    components: [row, rowBtns]
-  });
-}
-
-// Helper para renderizar seleção de cargos de nível de Adv (1, 2, 3)
-async function showAdvLevelSelect(interaction, level) {
-  const adv = getAdvConfig();
-  const key = `${interaction.guildId}_${interaction.user.id}`;
-  const pending = pendingConfigs.get(key);
-
-  let cIds = adv?.[`cargo${level}Ids`] || (adv?.[`cargo${level}Id`] ? [adv[`cargo${level}Id`]] : []);
-  let isPending = false;
-  if (pending && pending.type === `adv_cargo_${level}`) {
-    cIds = pending.roles;
-    isPending = true;
-  }
-
-  const currentText = cIds.length > 0 
-    ? cIds.map(id => `<@&${id}>`).join(', ') + (isPending ? ' ⚠️ *(Pendente de Confirmação)*' : '') 
-    : '❌ *Nenhum cargo configurado*';
-
-  const select = new RoleSelectMenuBuilder()
-    .setCustomId(`painelconfig_selectrole_adv_cargo${level}`)
-    .setPlaceholder(`Selecione os cargos para Adv ${level}...`)
-    .setMinValues(1)
-    .setMaxValues(5);
-  
-  const btnConfirm = new ButtonBuilder().setCustomId(`painelconfig_btn_confirm_adv_cargo_${level}`).setLabel('Confirmar').setStyle(ButtonStyle.Success).setEmoji('✅');
-  const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_adv_cargos_adv').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
-
-  const row = new ActionRowBuilder().addComponents(select);
-  const rowBtns = new ActionRowBuilder().addComponents(btnConfirm, btnVoltar);
-
-  return await updatePanel(interaction, {
-    content: `Selecione os cargos correspondentes ao acúmulo de **${level} advertência(s)** no servidor:\n\n• **Cargos Selecionados:** ${currentText}`,
-    components: [row, rowBtns]
-  });
-}
-
-// Helper para renderizar seleção de canais de alertas de Adv
-async function showAdvAlertsChannelSelect(interaction) {
-  const adv = getAdvConfig();
-  const key = `${interaction.guildId}_${interaction.user.id}`;
-  const pending = pendingConfigs.get(key);
-
-  const currentChannelId = adv?.canalId;
-  const currentText = currentChannelId ? `<#${currentChannelId}>` : '❌ *Não Configurado*';
-  
-  let newText = '';
-  if (pending && pending.type === 'adv_alertas') {
-    newText = `\n\n👉 **Nova seleção (Pendente de Confirmação):** <#${pending.channelId}> ⚠️`;
-  }
-  
-  const select = new ChannelSelectMenuBuilder()
-    .setCustomId('painelconfig_selectchan_adv_alertas')
-    .setPlaceholder('Escolha o canal de alertas de Adv...')
-    .addChannelTypes(ChannelType.GuildText);
-  
-  const btnConfirm = new ButtonBuilder().setCustomId('painelconfig_btn_confirm_adv_alertas').setLabel('Confirmar').setStyle(ButtonStyle.Success).setEmoji('✅');
-  const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back_adv').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
-
-  const row = new ActionRowBuilder().addComponents(select);
-  const rowBtns = new ActionRowBuilder().addComponents(btnConfirm, btnVoltar);
-
-  return await updatePanel(interaction, {
-    content: `Selecione abaixo o canal onde serão publicados os avisos das advertências aplicadas:\n\n• **Canal Atual:** ${currentText}${newText}`,
-    components: [row, rowBtns]
-  });
-}
-
-// Helper para renderizar seleção de canais de revogações de Adv
-async function showAdvRevsChannelSelect(interaction) {
-  const adv = getAdvConfig();
-  const key = `${interaction.guildId}_${interaction.user.id}`;
-  const pending = pendingConfigs.get(key);
-
-  const currentChannelId = adv?.canalRevogacaoId;
-  const currentText = currentChannelId ? `<#${currentChannelId}>` : '❌ *Não Configurado*';
-  
-  let newText = '';
-  if (pending && pending.type === 'adv_revocacoes') {
-    newText = `\n\n👉 **Nova seleção (Pendente de Confirmação):** <#${pending.channelId}> ⚠️`;
-  }
-  
-  const select = new ChannelSelectMenuBuilder()
-    .setCustomId('painelconfig_selectchan_adv_revocacoes')
-    .setPlaceholder('Escolha o canal de solicitações de revogação...')
-    .addChannelTypes(ChannelType.GuildText);
-  
-  const btnConfirm = new ButtonBuilder().setCustomId('painelconfig_btn_confirm_adv_revocacoes').setLabel('Confirmar').setStyle(ButtonStyle.Success).setEmoji('✅');
-  const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back_adv').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
-
-  const row = new ActionRowBuilder().addComponents(select);
-  const rowBtns = new ActionRowBuilder().addComponents(btnConfirm, btnVoltar);
-
-  return await updatePanel(interaction, {
-    content: `Selecione abaixo o canal onde a Staff receberá os pedidos de revogação das advertências:\n\n• **Canal Atual:** ${currentText}${newText}`,
-    components: [row, rowBtns]
-  });
-}
-
-// Helper para renderizar seleção de cargos de Farm
-async function showFarmRolesSelect(interaction) {
-  const farm = getGlobalFarmConfig();
-  const key = `${interaction.guildId}_${interaction.user.id}`;
-  const pending = pendingConfigs.get(key);
-
-  let roles = farm?.cargosAdminIds || [];
-  let isPending = false;
-  if (pending && pending.type === 'farm_roles') {
-    roles = pending.roles;
-    isPending = true;
-  }
-
-  const staffsText = roles.length > 0
-    ? roles.map(id => `<@&${id}>`).join(', ') + (isPending ? ' ⚠️ *(Pendente de Confirmação)*' : '')
-    : '❌ *Não Configurado*';
-
-  const select = new RoleSelectMenuBuilder()
-    .setCustomId('painelconfig_selectroles_farm')
-    .setPlaceholder('Escolha os cargos autorizados a gerenciar metas e farms...')
-    .setMinValues(1)
-    .setMaxValues(3);
-  
-  const btnConfirm = new ButtonBuilder().setCustomId('painelconfig_btn_confirm_farm_roles').setLabel('Confirmar').setStyle(ButtonStyle.Success).setEmoji('✅');
-  const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back_farm').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
-
-  const row = new ActionRowBuilder().addComponents(select);
-  const rowBtns = new ActionRowBuilder().addComponents(btnConfirm, btnVoltar);
-
-  return await updatePanel(interaction, {
-    content: `Selecione abaixo até 3 cargos autorizados a gerenciar as metas e canais de farm:\n\n• **Cargos Selecionados:** ${staffsText}`,
-    components: [row, rowBtns]
-  });
-}
-
-// Helper para renderizar seleção de canais de Farm
-async function showFarmChannelsSelect(interaction) {
-  const farm = getGlobalFarmConfig();
-  const key = `${interaction.guildId}_${interaction.user.id}`;
-  const pending = pendingConfigs.get(key);
-
-  let panelId = farm?.painelCanalId;
-  let catId = farm?.categoriaId;
-  let panelPending = false;
-  let catPending = false;
-
-  if (pending && pending.type === 'farm_channels') {
-    if (pending.painelCanalId) {
-      panelId = pending.painelCanalId;
-      panelPending = true;
-    }
-    if (pending.categoriaId) {
-      catId = pending.categoriaId;
-      catPending = true;
-    }
-  }
-
-  const panelText = panelId ? `<#${panelId}>` + (panelPending ? ' ⚠️ *(Pendente)*' : '') : '❌ *Não Configurado*';
-  const catText = catId ? `<#${catId}>` + (catPending ? ' ⚠️ *(Pendente)*' : '') : '❌ *Não Configurado*';
-
-  const selectPanel = new ChannelSelectMenuBuilder()
-    .setCustomId('painelconfig_selectchan_farm_panel')
-    .setPlaceholder('Escolha o canal onde ficará o Painel de Farm...')
-    .addChannelTypes(ChannelType.GuildText);
-
-  const selectCat = new ChannelSelectMenuBuilder()
-    .setCustomId('painelconfig_selectchan_farm_category')
-    .setPlaceholder('Escolha a categoria dos canais de farm dos membros...')
-    .addChannelTypes(ChannelType.GuildCategory);
-
-  const btnConfirm = new ButtonBuilder().setCustomId('painelconfig_btn_confirm_farm_channels').setLabel('Confirmar').setStyle(ButtonStyle.Success).setEmoji('✅');
-  const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back_farm').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
-
-  const rowP = new ActionRowBuilder().addComponents(selectPanel);
-  const rowC = new ActionRowBuilder().addComponents(selectCat);
-  const rowBtns = new ActionRowBuilder().addComponents(btnConfirm, btnVoltar);
-
-  return await updatePanel(interaction, {
-    content: 
-      `Configure abaixo o canal do painel e a categoria correspondente de farm:\n\n` +
-      `• **Canal do Painel:** ${panelText}\n` +
-      `• **Categoria de Farm:** ${catText}`,
-    components: [rowP, rowC, rowBtns]
-  });
-}
-
-// Helper para renderizar seleção de cargos para módulos simples
-async function showSimpleModuleRolesSelect(interaction, moduleName) {
-  const key = `${interaction.guildId}_${interaction.user.id}`;
-  const pending = pendingConfigs.get(key);
-
-  let roles = [];
-  let isPending = false;
-
-  if (pending && pending.type === `simple_roles_${moduleName}`) {
-    roles = pending.roles;
-    isPending = true;
-  } else {
-    if (moduleName === 'venda') {
-      const config = getGlobalVendaConfig();
-      roles = config?.cargosPermitidosIds || [];
-    } else if (moduleName === 'encomenda') {
-      const config = getGlobalEncomendaConfig();
-      roles = config?.cargosPermitidosIds || [];
-    } else if (moduleName === 'ausencia') {
-      const config = getGlobalAusenciaConfig();
-      roles = config?.cargosPermitidosIds || [];
-    } else if (moduleName === 'recrutamento') {
-      const config = getGlobalRecrutamentoConfig();
-      roles = config?.cargosStaffIds || [];
-    }
-  }
-
-  const staffsText = roles.length > 0 
-    ? roles.map(id => `<@&${id}>`).join(', ') + (isPending ? ' ⚠️ *(Pendente de Confirmação)*' : '') 
-    : '❌ *Não Configurado*';
-
-  const select = new RoleSelectMenuBuilder()
-    .setCustomId(`painelconfig_selectroles_simple_${moduleName}`)
-    .setPlaceholder(`Selecione os cargos para ${moduleName}...`)
-    .setMinValues(1)
-    .setMaxValues(5);
-  
-  const btnConfirm = new ButtonBuilder().setCustomId(`painelconfig_btn_confirm_simple_roles_${moduleName}`).setLabel('Confirmar').setStyle(ButtonStyle.Success).setEmoji('✅');
-  const btnVoltar = new ButtonBuilder().setCustomId(`painelconfig_btn_back_simple_${moduleName}`).setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
-
-  const row = new ActionRowBuilder().addComponents(select);
-  const rowBtns = new ActionRowBuilder().addComponents(btnConfirm, btnVoltar);
-
-  return await updatePanel(interaction, {
-    content: `Selecione abaixo até 5 cargos permitidos para o módulo **${moduleName}**:\n\n• **Cargos Selecionados:** ${staffsText}`,
-    components: [row, rowBtns]
-  });
-}
-
-// Helper para renderizar seleção de canais para módulos simples
-async function showSimpleModuleChannelsSelect(interaction, moduleName) {
-  const key = `${interaction.guildId}_${interaction.user.id}`;
-  const pending = pendingConfigs.get(key);
-
-  if (moduleName === 'recrutamento') {
-    const config = getGlobalRecrutamentoConfig();
-    
-    let welcomeId = config?.canalPainelId;
-    let pedidosId = config?.canalPedidosId;
-    let logsId = config?.canalLogsNegadoId;
-    let welcomePending = false;
-    let pedidosPending = false;
-    let logsPending = false;
-
-    if (pending && pending.type === 'simple_channels_recrutamento') {
-      if (pending.welcome) {
-        welcomeId = pending.welcome;
-        welcomePending = true;
-      }
-      if (pending.pedidos) {
-        pedidosId = pending.pedidos;
-        pedidosPending = true;
-      }
-      if (pending.logs) {
-        logsId = pending.logs;
-        logsPending = true;
-      }
-    }
-
-    const welcomeText = welcomeId ? `<#${welcomeId}>` + (welcomePending ? ' ⚠️ *(Pendente)*' : '') : '❌ *Não Configurado*';
-    const pedidosText = pedidosId ? `<#${pedidosId}>` + (pedidosPending ? ' ⚠️ *(Pendente)*' : '') : '❌ *Não Configurado*';
-    const logsText = logsId ? `<#${logsId}>` + (logsPending ? ' ⚠️ *(Pendente)*' : '') : '❌ *Não Configurado*';
-
-    const selectWelcome = new ChannelSelectMenuBuilder()
-      .setCustomId('painelconfig_selectchan_simple_recrutamento_welcome')
-      .setPlaceholder('Canal do Painel (Bem-vindo)...')
-      .addChannelTypes(ChannelType.GuildText);
-
-    const selectPedidos = new ChannelSelectMenuBuilder()
-      .setCustomId('painelconfig_selectchan_simple_recrutamento_pedidos')
-      .setPlaceholder('Canal de Pedidos (Inscrições Staff)...')
-      .addChannelTypes(ChannelType.GuildText);
-
-    const selectLogs = new ChannelSelectMenuBuilder()
-      .setCustomId('painelconfig_selectchan_simple_recrutamento_logs')
-      .setPlaceholder('Canal de Logs Negados...')
-      .addChannelTypes(ChannelType.GuildText);
-
-    const btnConfirm = new ButtonBuilder().setCustomId('painelconfig_btn_confirm_simple_channels_recrutamento').setLabel('Confirmar').setStyle(ButtonStyle.Success).setEmoji('✅');
-    const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back_simple_recrutamento').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
-
-    const rowBtns = new ActionRowBuilder().addComponents(btnConfirm, btnVoltar);
-
-    return await updatePanel(interaction, {
-      content: 
-        `Selecione abaixo os 3 canais de texto para o recrutamento:\n\n` +
-        `• **Painel (Bem-vindo):** ${welcomeText}\n` +
-        `• **Pedidos (Aprovação):** ${pedidosText}\n` +
-        `• **Logs Negados:** ${logsText}`,
-      components: [
-        new ActionRowBuilder().addComponents(selectWelcome),
-        new ActionRowBuilder().addComponents(selectPedidos),
-        new ActionRowBuilder().addComponents(selectLogs),
-        rowBtns
-      ]
-    });
-  } else {
-    const isForum = ['venda', 'encomenda'].includes(moduleName);
-    const channelTypes = isForum ? [ChannelType.GuildForum] : [ChannelType.GuildText];
-    
-    let currentId = null;
-    let isPending = false;
-
-    if (pending && pending.type === `simple_channels_${moduleName}`) {
-      currentId = pending.channelId;
-      isPending = true;
-    } else {
-      if (moduleName === 'venda') {
-        const config = getGlobalVendaConfig();
-        currentId = config?.forumCanalId;
-      } else if (moduleName === 'encomenda') {
-        const config = getGlobalEncomendaConfig();
-        currentId = config?.forumCanalId;
-      } else if (moduleName === 'ausencia') {
-        const config = getGlobalAusenciaConfig();
-        currentId = config?.canalId;
-      }
-    }
-
-    const currentText = currentId ? `<#${currentId}>` + (isPending ? ' ⚠️ *(Pendente de Confirmação)*' : '') : '❌ *Não Configurado*';
-
-    const select = new ChannelSelectMenuBuilder()
-      .setCustomId(`painelconfig_selectchan_simple_${moduleName}`)
-      .setPlaceholder(`Selecione o canal para ${moduleName}...`)
-      .addChannelTypes(channelTypes);
-
-    const btnConfirm = new ButtonBuilder().setCustomId(`painelconfig_btn_confirm_simple_channels_${moduleName}`).setLabel('Confirmar').setStyle(ButtonStyle.Success).setEmoji('✅');
-    const btnVoltar = new ButtonBuilder().setCustomId(`painelconfig_btn_back_simple_${moduleName}`).setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
-
-    const row = new ActionRowBuilder().addComponents(select);
-    const rowBtns = new ActionRowBuilder().addComponents(btnConfirm, btnVoltar);
-
-    return await updatePanel(interaction, {
-      content: `Selecione abaixo o canal/fórum correspondente ao módulo **${moduleName}**:\n\n• **Canal Configurado:** ${currentText}`,
-      components: [row, rowBtns]
-    });
-  }
-}
-
-// Renderiza a tela de seleção de canais de logs
-async function showLogsChannelSelect(interaction, commandName) {
-  const dataAtual = new Date().toLocaleDateString('pt-BR');
-  
-  const key = `${interaction.guildId}_${interaction.user.id}`;
-  const pending = pendingConfigs.get(key);
-  
-  const channelId = getLogChannel(commandName);
-  const currentText = channelId ? `<#${channelId}>` : '❌ *Nenhum canal configurado*';
-  
-  let newChannelText = '';
-  if (pending && pending.type === 'logs' && pending.commandName === commandName) {
-    newChannelText = `\n\n👉 **Nova seleção (Pendente de Confirmação):** <#${pending.channelId}> ⚠️`;
-  }
-
-  const embed = new EmbedBuilder()
-    .setTitle(`📋 CONFIGURAR LOG: /${commandName.toUpperCase()} 📋`)
-    .setDescription(
-      `Selecione abaixo o canal de texto para os logs do comando **/${commandName}**.\n\n` +
-      `• **Canal Atual:** ${currentText}${newChannelText}\n\n` +
-      `Clique no botão **Confirmar** para salvar e voltar.`
-    )
-    .setColor(3447003)
-    .setFooter({ text: `LuxBot Logs • ${dataAtual} • criado por chegaheitor` });
-
-  const channelSelect = new ChannelSelectMenuBuilder()
-    .setCustomId(`painelconfig_logs_channel_${commandName}`)
-    .setPlaceholder('Escolha o canal de logs...')
-    .addChannelTypes(ChannelType.GuildText);
-
-  const btnConfirm = new ButtonBuilder().setCustomId(`painelconfig_btn_confirm_logs_${commandName}`).setLabel('Confirmar').setStyle(ButtonStyle.Success).setEmoji('✅');
-  const btnDisable = new ButtonBuilder().setCustomId(`painelconfig_logs_disable_${commandName}`).setLabel('Desativar Log').setStyle(ButtonStyle.Danger).setEmoji('❌');
-  const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back_logs').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
-
-  const rowChan = new ActionRowBuilder().addComponents(channelSelect);
-  const rowBtns = new ActionRowBuilder().addComponents(btnConfirm, btnDisable, btnVoltar);
-
-  return await updatePanel(interaction, { content: null, embeds: [embed], components: [rowChan, rowBtns] });
-}
-
-// Renderiza a tela de seleção de cargos para criação do Baú
-async function showBauCreateRolesSelect(interaction, name, channelId) {
-  const key = `${interaction.guildId}_${interaction.user.id}`;
-  const pending = pendingConfigs.get(key);
-  
-  let roles = [];
-  let isPending = false;
-  if (pending && pending.type === 'bau_create') {
-    roles = pending.roles;
-    isPending = true;
-  }
-  
-  const currentText = roles.length > 0
-    ? roles.map(id => `<@&${id}>`).join(', ') + (isPending ? ' ⚠️ *(Pendente de Confirmação)*' : '')
-    : '❌ *Nenhum cargo selecionado*';
-
-  const selectRoles = new RoleSelectMenuBuilder()
-    .setCustomId(`painelconfig_selectroles_bau_create_${name}_${channelId}`)
-    .setPlaceholder('Selecione os cargos autorizados...')
-    .setMinValues(1)
-    .setMaxValues(5);
-
-  const btnConfirm = new ButtonBuilder().setCustomId('painelconfig_btn_confirm_bau_create').setLabel('Confirmar').setStyle(ButtonStyle.Success).setEmoji('✅');
-  const btnBack = new ButtonBuilder().setCustomId('painelconfig_btn_back_bau').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
-
-  const row = new ActionRowBuilder().addComponents(selectRoles);
-  const rowBack = new ActionRowBuilder().addComponents(btnConfirm, btnBack);
-
-  return await updatePanel(interaction, {
-    content: `Selecione até 5 cargos permitidos a adicionar/remover itens no baú **${name}** (<#${channelId}>):\n\n• **Cargos Selecionados:** ${currentText}`,
-    components: [row, rowBack]
-  });
-}
 
 // Painel de Logs
 async function showLogsMenu(interaction) {
@@ -1470,7 +1065,7 @@ async function showLogsMenu(interaction) {
   const rowSel = new ActionRowBuilder().addComponents(select);
   const rowBtn = new ActionRowBuilder().addComponents(btnVoltar);
 
-  return await updatePanel(interaction, { embeds: [embed], components: [rowSel, rowBtn] });
+  return await interaction.update({ embeds: [embed], components: [rowSel, rowBtn] });
 }
 
 // Painel de Advertências
@@ -1483,14 +1078,18 @@ async function showAdvMenu(interaction) {
   const staffsText = adv?.cargosStaffIds && adv.cargosStaffIds.length > 0
     ? adv.cargosStaffIds.map(id => `<@&${id}>`).join(', ')
     : '❌ *Não Configurado*';
-  
-  const c1Ids = adv?.cargo1Ids || (adv?.cargo1Id ? [adv.cargo1Id] : []);
-  const c2Ids = adv?.cargo2Ids || (adv?.cargo2Id ? [adv.cargo2Id] : []);
-  const c3Ids = adv?.cargo3Ids || (adv?.cargo3Id ? [adv.cargo3Id] : []);
+  const formatRoles = (val) => {
+    if (!val) return '❌';
+    if (Array.isArray(val)) {
+      if (val.length === 0) return '❌';
+      return val.map(id => `<@&${id}>`).join(', ');
+    }
+    return `<@&${val}>`;
+  };
 
-  const c1Text = c1Ids.length > 0 ? c1Ids.map(id => `<@&${id}>`).join(', ') : '❌';
-  const c2Text = c2Ids.length > 0 ? c2Ids.map(id => `<@&${id}>`).join(', ') : '❌';
-  const c3Text = c3Ids.length > 0 ? c3Ids.map(id => `<@&${id}>`).join(', ') : '❌';
+  const c1Text = formatRoles(adv?.cargo1Id);
+  const c2Text = formatRoles(adv?.cargo2Id);
+  const c3Text = formatRoles(adv?.cargo3Id);
 
   const embed = new EmbedBuilder()
     .setTitle('⚖️ CONFIGURAÇÃO DE ADVERTÊNCIAS ⚖️')
@@ -1499,9 +1098,7 @@ async function showAdvMenu(interaction) {
       `• **📢 Canal de Alertas:** ${alertsText}\n` +
       `• **⚖️ Canal de Revogações:** ${revsText}\n` +
       `• **💼 Staffs Autorizados:** ${staffsText}\n` +
-      `• **⚠️ Nível 1:** ${c1Text}\n` +
-      `• **⚠️ Nível 2:** ${c2Text}\n` +
-      `• **⚠️ Nível 3:** ${c3Text}`
+      `• **⚠️ Nível 1:** ${c1Text} | **Nível 2:** ${c2Text} | **Nível 3:** ${c3Text}`
     )
     .setColor(15158332)
     .setFooter({ text: `LuxBot Advertências • ${dataAtual} • criado por chegaheitor` });
@@ -1515,7 +1112,7 @@ async function showAdvMenu(interaction) {
   const row1 = new ActionRowBuilder().addComponents(btnChAlerts, btnChRevs, btnStaff, btnCargos);
   const row2 = new ActionRowBuilder().addComponents(btnVoltar);
 
-  return await updatePanel(interaction, { embeds: [embed], components: [row1, row2] });
+  return await interaction.update({ embeds: [embed], components: [row1, row2] });
 }
 
 // Painel de Farm
@@ -1551,7 +1148,7 @@ async function showFarmMenu(interaction) {
   const row1 = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnMaterials, btnCriar);
   const row2 = new ActionRowBuilder().addComponents(btnVoltar);
 
-  return await updatePanel(interaction, { embeds: [embed], components: [row1, row2] });
+  return await interaction.update({ embeds: [embed], components: [row1, row2] });
 }
 
 // Painel de Baús
@@ -1578,7 +1175,7 @@ async function showBauMenu(interaction) {
 
   const row = new ActionRowBuilder().addComponents(btnCriar, btnItems, btnVoltar);
 
-  return await updatePanel(interaction, { embeds: [embed], components: [row] });
+  return await interaction.update({ embeds: [embed], components: [row] });
 }
 
 // Renderizador Genérico para Vendas, Encomendas, Ausências e Recrutamento
@@ -1656,5 +1253,5 @@ async function showSimpleModuleMenu(interaction, moduleName) {
 
   const row = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnCriar, btnVoltar);
 
-  return await updatePanel(interaction, { embeds: [embed], components: [row] });
+  return await interaction.update({ embeds: [embed], components: [row] });
 }

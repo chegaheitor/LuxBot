@@ -68,26 +68,32 @@ export async function execute(interaction) {
     const activeCount = removeWarning(targetUser.id, interaction.user.id, motivo);
 
     // Gerenciamento de cargos
-    const cargo1Ids = config.cargo1Ids || (config.cargo1Id ? [config.cargo1Id] : []);
-    const cargo2Ids = config.cargo2Ids || (config.cargo2Id ? [config.cargo2Id] : []);
-    const cargo3Ids = config.cargo3Ids || (config.cargo3Id ? [config.cargo3Id] : []);
+    const getRolesForLevel = (val) => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val;
+      return [val];
+    };
 
-    const rolesToRemove = [];
-    const rolesToAdd = [];
+    const rolesLevel1 = getRolesForLevel(config.cargo1Id);
+    const rolesLevel2 = getRolesForLevel(config.cargo2Id);
+    const rolesLevel3 = getRolesForLevel(config.cargo3Id);
+
+    let rolesToAdd = [];
+    let rolesToRemove = [];
 
     if (activeCount === 0) {
-      rolesToRemove.push(...cargo1Ids, ...cargo2Ids, ...cargo3Ids);
+      rolesToRemove = [...rolesLevel1, ...rolesLevel2, ...rolesLevel3];
     } else if (activeCount === 1) {
-      rolesToAdd.push(...cargo1Ids);
-      rolesToRemove.push(...cargo2Ids, ...cargo3Ids);
+      rolesToAdd = rolesLevel1;
+      rolesToRemove = [...rolesLevel2, ...rolesLevel3];
     } else if (activeCount === 2) {
-      rolesToAdd.push(...cargo2Ids);
-      rolesToRemove.push(...cargo1Ids, ...cargo3Ids);
+      rolesToAdd = rolesLevel2;
+      rolesToRemove = [...rolesLevel1, ...rolesLevel3];
     }
 
     // Aplicar alterações de cargos
     for (const rId of rolesToAdd) {
-      if (rId) {
+      if (rId && !member.roles.cache.has(rId)) {
         await member.roles.add(rId).catch(err => console.error('Erro ao adicionar cargo de advertência:', err));
       }
     }
@@ -101,11 +107,10 @@ export async function execute(interaction) {
     const channel = await interaction.guild.channels.fetch(config.canalId).catch(() => null);
     let roleName = 'Nenhum / Removido';
     if (rolesToAdd.length > 0) {
-      const names = rolesToAdd
-        .map(id => interaction.guild.roles.cache.get(id))
-        .filter(r => r)
-        .map(r => `${r}`);
-      if (names.length > 0) roleName = names.join(', ');
+      roleName = rolesToAdd.map(rId => {
+        const r = interaction.guild.roles.cache.get(rId);
+        return r ? `${r}` : 'Cargo Advertência';
+      }).join(', ');
     }
 
     const pubEmbed = new EmbedBuilder()
