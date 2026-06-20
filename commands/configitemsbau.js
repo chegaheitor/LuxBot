@@ -21,8 +21,9 @@ export const data = new SlashCommandBuilder()
 // Função auxiliar para construir o Embed Principal
 function buildConfigEmbed() {
   const itens = getBauItems();
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
   return new EmbedBuilder()
-    .setTitle('⚙️ CONFIGURAÇÃO DE ITENS DO BAÚ')
+    .setTitle('⚙️ CONFIGURAÇÃO DE ITENS DE BAÚ ⚙️')
     .setDescription(
       'Abaixo estão listados os itens atualmente cadastrados para o baú. ' +
       'Eles aparecerão nos menus de seleção para os membros ao realizar adições.\n\n' +
@@ -33,7 +34,7 @@ function buildConfigEmbed() {
       value: itens.map((it, i) => `${i + 1}. **${it}**`).join('\n') || 'Nenhum item cadastrado.'
     })
     .setColor(12096338) // Cor de madeira
-    .setFooter({ text: 'Lux Baú Config' })
+    .setFooter({ text: `LuxBot Configuração de Itens do Baú • ${dataAtual} • criado por chegaheitor` })
     .setTimestamp();
 }
 
@@ -84,6 +85,7 @@ export async function execute(interaction) {
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
 
   // 1. Botão Adicionar Item -> Abre Modal
   if (customId === 'configitemsbau_btn_adicionar') {
@@ -154,9 +156,10 @@ export async function handleInteraction(interaction) {
       }
 
       const embedRemover = new EmbedBuilder()
-        .setTitle('➖ REMOVER ITEM DO BAÚ')
+        .setTitle('➖ REMOVER ITEM DO BAÚ ➖')
         .setDescription('Selecione abaixo o item que deseja excluir da lista de itens disponíveis do baú.')
         .setColor(15158332)
+        .setFooter({ text: `LuxBot Configuração de Itens do Baú • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       const options = itens.map(i => ({

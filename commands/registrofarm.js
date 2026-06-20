@@ -36,6 +36,7 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
     const canalPainel = interaction.options.getChannel('canal_painel');
     const categoria = interaction.options.getChannel('categoria');
 
@@ -55,10 +56,10 @@ export async function execute(interaction) {
     });
 
     const embed = new EmbedBuilder()
-      .setTitle('PASTA DE FARM')
+      .setTitle('📋 PASTA DE FARM 📋')
       .setDescription('Solicite aqui a sua pasta de farm.')
       .setColor(2326507)
-      .setFooter({ text: 'Lux Farm • Bot criado por chegaheitor' });
+      .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
 
     const button = new ButtonBuilder()
       .setCustomId('farm_abrir_pasta_btn')
@@ -86,6 +87,7 @@ export async function execute(interaction) {
 // Método para tratar interações relativas a este comando
 export async function handleInteraction(interaction) {
   const { customId } = interaction;
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
 
   // 1. Tratar botões
   if (interaction.isButton()) {
@@ -185,10 +187,10 @@ export async function handleInteraction(interaction) {
 
         // F. Enviar embed de boas-vindas no novo canal
         const farmWelcomeEmbed = new EmbedBuilder()
-          .setTitle(`📦 ${recruta.nome.toUpperCase()} - FARM`)
+          .setTitle(`📋 FARM: ${recruta.nome.toUpperCase()} 📋`)
           .setDescription('Nesta pasta você irá colocar o farm que fizer.')
           .setColor(2326507)
-          .setFooter({ text: 'Lux Farm • Use os botões abaixo' });
+          .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
 
         const btnAdd = new ButtonBuilder()
           .setCustomId('farm_adicionar_btn')
@@ -584,7 +586,7 @@ export async function handleInteraction(interaction) {
             `Aguardando a confirmação do pagamento pelos administradores.`
           )
           .setColor(3066993)
-          .setFooter({ text: 'Lux Farm' });
+          .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
 
         const btnPagar = new ButtonBuilder()
           .setCustomId(`farm_pagar_meta_btn_${donoId}`)
@@ -941,7 +943,7 @@ export async function handleInteraction(interaction) {
             `Aguardando confirmação de um administrador.`
           )
           .setColor(2326507)
-          .setFooter({ text: 'Lux Farm' });
+          .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
 
         const confirmBtn = new ButtonBuilder()
           .setCustomId(`farm_confirmar_btn_${channelConfig.donoId}_${item}_${quantidade}_${dataStr}`)
@@ -1006,7 +1008,7 @@ export async function handleInteraction(interaction) {
             `Aguardando a confirmação do pagamento pelos administradores.`
           )
           .setColor(3066993)
-          .setFooter({ text: 'Lux Farm' });
+          .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
 
         const btnPagar = new ButtonBuilder()
           .setCustomId(`farm_pagar_meta_btn_${channelConfig.donoId}`)

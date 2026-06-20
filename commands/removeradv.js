@@ -22,6 +22,7 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
     const config = getAdvConfig();
 
     if (!config) {
@@ -110,7 +111,7 @@ export async function execute(interaction) {
         { name: '📝 Motivo da Remoção:', value: motivo, inline: false },
         { name: '💼 Novo Cargo de Adv:', value: roleName, inline: true }
       )
-      .setFooter({ text: 'Lux Advertências' })
+      .setFooter({ text: `LuxBot Remover ADV • ${dataAtual} • criado por chegaheitor` })
       .setTimestamp();
 
     if (channel) {
@@ -125,7 +126,7 @@ export async function execute(interaction) {
 
     // Enviar log de remoção de advertência
     const logEmbed = new EmbedBuilder()
-      .setTitle('✅ Advertência Removida')
+      .setTitle('✅ ADVERTÊNCIA REMOVIDA ✅')
       .setColor(3066993)
       .setDescription(`<@${interaction.user.id}> removeu uma advertência de ${targetUser}.`)
       .addFields(
@@ -133,6 +134,7 @@ export async function execute(interaction) {
         { name: '🔢 Advertências Ativas:', value: `**${activeCount} / 3**`, inline: true },
         { name: '📝 Motivo da Remoção:', value: motivo, inline: false }
       )
+      .setFooter({ text: `LuxBot Remover ADV • ${dataAtual} • criado por chegaheitor` })
       .setTimestamp();
 
     await sendLog(interaction.client, interaction.guild, 'removeradv', logEmbed);

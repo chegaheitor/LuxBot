@@ -72,6 +72,7 @@ function createStatsMenu(targetUserId, executorId, selectedValue = 'principal') 
 // Gera o Embed específico para cada aba selecionada
 export function generatePerfilEmbed(targetUser, recruta, tab = 'principal') {
   const avatarUrl = targetUser.displayAvatarURL({ dynamic: true, size: 256 });
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
   const embed = new EmbedBuilder()
     .setAuthor({ name: `Perfil de ${targetUser.username}`, iconURL: avatarUrl })
     .setThumbnail(avatarUrl)
@@ -94,7 +95,7 @@ export function generatePerfilEmbed(targetUser, recruta, tab = 'principal') {
         { name: '📋 Recrutador (ID):', value: recruta.recrutadorId || 'Não informado', inline: true },
         { name: '📁 Pasta de Farm:', value: farmFolderStr, inline: false }
       )
-      .setFooter({ text: 'Lux Perfil • Principal' });
+      .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` });
   }
 
   else if (tab === 'ausencias') {
@@ -103,7 +104,7 @@ export function generatePerfilEmbed(targetUser, recruta, tab = 'principal') {
       .setTitle('🔴 HISTÓRICO DE AUSÊNCIAS 🔴')
       .setDescription(`Registro de ausências temporárias solicitadas pelo membro.\n\n**📊 Total de Ausências:** \`${count}\``)
       .setColor(15158332) // Vermelho
-      .setFooter({ text: 'Lux Perfil • Ausências' });
+      .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` });
 
     if (count > 0) {
       const list = recruta.ausencias.slice(-5).reverse().map((a, i) => {
@@ -121,7 +122,7 @@ export function generatePerfilEmbed(targetUser, recruta, tab = 'principal') {
       .setTitle('🛍️ HISTÓRICO DE VENDAS 🛍️')
       .setDescription(`Vendas faturadas e cadastradas no fórum de vendas.\n\n**📊 Total de Vendas:** \`${count}\``)
       .setColor(3066993) // Verde
-      .setFooter({ text: 'Lux Perfil • Vendas' });
+      .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` });
 
     if (count > 0) {
       const list = recruta.vendas.slice(-5).reverse().map((v, i) => {
@@ -139,7 +140,7 @@ export function generatePerfilEmbed(targetUser, recruta, tab = 'principal') {
       .setTitle('📦 HISTÓRICO DE ENCOMENDAS 📦')
       .setDescription(`Encomendas faturadas e organizadas no fórum de encomendas.\n\n**📊 Total de Encomendas:** \`${count}\``)
       .setColor(15844367) // Amarelo/Dourado
-      .setFooter({ text: 'Lux Perfil • Encomendas' });
+      .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` });
 
     if (count > 0) {
       const list = recruta.encomendas.slice(-5).reverse().map((e, i) => {
@@ -157,7 +158,7 @@ export function generatePerfilEmbed(targetUser, recruta, tab = 'principal') {
       .setTitle('🛠️ HISTÓRICO DE METAS 🛠️')
       .setDescription(`Registro de metas de farm batidas declaradas e status de pagamento.\n\n**📊 Total de Metas:** \`${count}\``)
       .setColor(10181046) // Roxo
-      .setFooter({ text: 'Lux Perfil • Metas' });
+      .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` });
 
     if (count > 0) {
       const list = recruta.metas.slice(-5).reverse().map((m, i) => {
@@ -178,7 +179,7 @@ export function generatePerfilEmbed(targetUser, recruta, tab = 'principal') {
       .setTitle('⚠️ HISTÓRICO DE ADVERTÊNCIAS ⚠️')
       .setDescription(`Histórico completo de advertências oficiais.\n\n**📊 Advertências Ativas:** \`${activeCount} / 3\``)
       .setColor(15105570) // Laranja/Vermelho
-      .setFooter({ text: 'Lux Perfil • Advertências' });
+      .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` });
 
     if (recruta.warnings && recruta.warnings.length > 0) {
       const list = recruta.warnings.slice(-5).reverse().map((w, i) => {

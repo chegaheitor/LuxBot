@@ -77,7 +77,7 @@ export async function execute(interaction) {
         'Clique no botão **Registrar Encomenda** abaixo para abrir o formulário.'
       )
       .setColor(2326507)
-      .setFooter({ text: 'Lux Encomendas • Bot por chegaheitor' })
+      .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
       .setTimestamp();
 
     const btnNovaEncomenda = new ButtonBuilder()
@@ -107,13 +107,14 @@ export async function execute(interaction) {
 
     // Enviar log de configuração de encomendas
     const logEmbed = new EmbedBuilder()
-      .setTitle('⚙️ Painel de Encomenda Configurado')
+      .setTitle('⚙️ PAINEL DE ENCOMENDA CONFIGURADO ⚙️')
       .setColor(3066993)
       .setDescription(`O administrador <@${interaction.user.id}> configurou o painel de encomendas no fórum ${canalForum}.`)
       .addFields({
         name: '💼 Cargos Autorizados:',
         value: cargosPermitidosIds.map(id => `<@&${id}>`).join(', ')
       })
+      .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
       .setTimestamp();
 
     await sendLog(interaction.client, interaction.guild, 'registroencomenda', logEmbed);
@@ -131,6 +132,7 @@ export async function execute(interaction) {
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
 
   // 1. Botão Registrar Encomenda clicado
   if (customId === 'encomenda_nova_btn') {
@@ -261,7 +263,7 @@ export async function handleInteraction(interaction) {
           { name: 'ℹ️ Status:', value: '⏳ Pendente', inline: true }
         )
         .setColor(15844367) // Dourado/Amarelo
-        .setFooter({ text: 'Lux Encomendas' })
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       // Botões do Estado Pendente: Iniciar Produção e Excluir Encomenda
@@ -301,7 +303,7 @@ export async function handleInteraction(interaction) {
 
       // Enviar log de nova encomenda
       const logEmbed = new EmbedBuilder()
-        .setTitle('📦 Encomenda Registrada')
+        .setTitle('📦 ENCOMENDA REGISTRADA 📦')
         .setColor(15844367)
         .setDescription(`O membro <@${interaction.user.id}> registrou uma nova encomenda no fórum ${forumChannel}.`)
         .addFields(
@@ -311,6 +313,7 @@ export async function handleInteraction(interaction) {
           { name: '📅 Entrega:', value: dataEntrega, inline: true },
           { name: '🤝 Parceria:', value: parceria, inline: true }
         )
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
@@ -380,7 +383,7 @@ export async function handleInteraction(interaction) {
           { name: 'ℹ️ Status:', value: '🛠️ Em Produção', inline: true }
         )
         .setColor(3447003) // Azul
-        .setFooter({ text: 'Lux Encomendas' })
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       // Botões do Estado Em Produção: Entregar Encomenda, Voltar a Pendente e Excluir Encomenda
@@ -411,9 +414,10 @@ export async function handleInteraction(interaction) {
 
       // Enviar log de produção
       const logEmbed = new EmbedBuilder()
-        .setTitle('🛠️ Encomenda em Produção')
+        .setTitle('🛠️ ENCOMENDA EM PRODUÇÃO 🛠️')
         .setColor(3447003)
         .setDescription(`O membro <@${interaction.user.id}> iniciou a produção da encomenda de ${cliente} no fórum <#${forumId}>.`)
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
@@ -492,7 +496,7 @@ export async function handleInteraction(interaction) {
           { name: 'ℹ️ Status:', value: '✅ Entregue', inline: true }
         )
         .setColor(3066993) // Verde
-        .setFooter({ text: 'Lux Encomendas' })
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       // Botões do Estado Entregue: Voltar a Pendente e Excluir Encomenda
@@ -517,9 +521,10 @@ export async function handleInteraction(interaction) {
 
       // Enviar log de entrega
       const logEmbed = new EmbedBuilder()
-        .setTitle('✅ Encomenda Entregue')
+        .setTitle('✅ ENCOMENDA ENTREGUE ✅')
         .setColor(3066993)
         .setDescription(`O membro <@${interaction.user.id}> marcou a encomenda de ${cliente} como entregue no fórum <#${forumId}>.`)
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
@@ -584,7 +589,7 @@ export async function handleInteraction(interaction) {
           { name: 'ℹ️ Status:', value: '⏳ Pendente', inline: true }
         )
         .setColor(15844367) // Dourado
-        .setFooter({ text: 'Lux Encomendas' })
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       // Botões do Estado Pendente: Iniciar Produção e Excluir Encomenda
@@ -609,9 +614,10 @@ export async function handleInteraction(interaction) {
 
       // Enviar log de reversão
       const logEmbed = new EmbedBuilder()
-        .setTitle('⏳ Encomenda Voltou a Pendente')
+        .setTitle('⏳ ENCOMENDA VOLTOU A PENDENTE ⏳')
         .setColor(15844367)
         .setDescription(`O membro <@${interaction.user.id}> redefiniu o status da encomenda de ${cliente} para pendente.`)
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
@@ -644,9 +650,10 @@ export async function handleInteraction(interaction) {
 
       // Enviar log de exclusão
       const logEmbed = new EmbedBuilder()
-        .setTitle('🗑️ Encomenda Excluída')
+        .setTitle('🗑️ ENCOMENDA EXCLUÍDA 🗑️')
         .setColor(15158332)
         .setDescription(`O administrador <@${interaction.user.id}> excluiu o tópico de encomenda **${thread.name}** no fórum <#${forumId}>.`)
+        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);

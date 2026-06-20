@@ -17,9 +17,11 @@ export const data = new SlashCommandBuilder()
 
 // Helper para gerar o embed de listagem de baús
 function generateListEmbed(baus) {
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
   const embed = new EmbedBuilder()
     .setTitle('📋 BAÚS CADASTRADOS 📋')
     .setColor(12096338) // Cor terrosa/madeira
+    .setFooter({ text: `LuxBot Listar Baú • ${dataAtual} • criado por chegaheitor` })
     .setTimestamp();
 
   if (baus.length === 0) {
@@ -197,7 +199,7 @@ export async function handleInteraction(interaction) {
         )
         .setTimestamp();
 
-      await sendLog(interaction.client, guild, 'registrobau', logEmbed);
+      await sendLog(interaction.client, guild, 'listarbau', logEmbed);
 
       // Atualiza o painel do listarbau
       const updatedBaus = getBaus();

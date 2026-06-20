@@ -29,11 +29,12 @@ export async function execute(interaction) {
       .filter(role => role.id !== guild.id && !role.managed) // Ignora @everyone e cargos de integração
       .sort((a, b) => b.position - a.position);
 
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
     const embed = new EmbedBuilder()
       .setTitle('👑 HIERARQUIA DE CARGOS - LUX 👑')
       .setDescription('Lista de todos os cargos do servidor por ordem hierárquica e seus membros atuais:')
       .setColor(2326507)
-      .setFooter({ text: `Consultado por ${interaction.user.tag}` })
+      .setFooter({ text: `LuxBot Hierarquia • ${dataAtual} • criado por chegaheitor` })
       .setTimestamp();
 
     let totalChars = embed.data.title.length + embed.data.description.length;

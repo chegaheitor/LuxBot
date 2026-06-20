@@ -77,7 +77,7 @@ export async function execute(interaction) {
         'Clique no botão **Nova Venda** abaixo para abrir o formulário.'
       )
       .setColor(2326507)
-      .setFooter({ text: 'Lux Vendas • Bot por chegaheitor' })
+      .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
       .setTimestamp();
 
     const btnNovaVenda = new ButtonBuilder()
@@ -107,13 +107,14 @@ export async function execute(interaction) {
 
     // Enviar log de configuração de vendas
     const logEmbed = new EmbedBuilder()
-      .setTitle('⚙️ Painel de Venda Configurado')
+      .setTitle('⚙️ PAINEL DE VENDA CONFIGURADO ⚙️')
       .setColor(3066993)
       .setDescription(`O administrador <@${interaction.user.id}> configurou o painel de vendas no fórum ${canalForum}.`)
       .addFields({
         name: '💼 Cargos Autorizados:',
         value: cargosPermitidosIds.map(id => `<@&${id}>`).join(', ')
       })
+      .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
       .setTimestamp();
 
     await sendLog(interaction.client, interaction.guild, 'registrovenda', logEmbed);
@@ -131,6 +132,7 @@ export async function execute(interaction) {
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
 
   // 1. Botão Nova Venda clicado
   if (customId === 'venda_nova_btn') {
@@ -264,7 +266,7 @@ export async function handleInteraction(interaction) {
           { name: '💼 Vendedor:', value: `<@${interaction.user.id}>`, inline: true }
         )
         .setColor(2326507)
-        .setFooter({ text: 'Lux Vendas' })
+        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       const btnConfirmar = new ButtonBuilder()
@@ -303,7 +305,7 @@ export async function handleInteraction(interaction) {
 
       // Enviar log de nova venda
       const logEmbed = new EmbedBuilder()
-        .setTitle('🛍️ Venda Registrada')
+        .setTitle('🛍️ VENDA REGISTRADA 🛍️')
         .setColor(3066993)
         .setDescription(`O membro <@${interaction.user.id}> registrou uma nova venda no fórum ${forumChannel}.`)
         .addFields(
@@ -313,6 +315,7 @@ export async function handleInteraction(interaction) {
           { name: '📅 Data:', value: dataVenda, inline: true },
           { name: '🤝 Parceria:', value: parceria, inline: true }
         )
+        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
@@ -376,9 +379,10 @@ export async function handleInteraction(interaction) {
 
       // Log de confirmação
       const logEmbed = new EmbedBuilder()
-        .setTitle('✅ Venda Confirmada')
+        .setTitle('✅ VENDA CONFIRMADA ✅')
         .setColor(3066993)
         .setDescription(`O administrador <@${interaction.user.id}> confirmou a venda realizada por <@${vendedorId}> no fórum <#${forumId}>.`)
+        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
@@ -411,9 +415,10 @@ export async function handleInteraction(interaction) {
 
       // Enviar log antes de deletar o canal
       const logEmbed = new EmbedBuilder()
-        .setTitle('🗑️ Venda Excluída')
+        .setTitle('🗑️ VENDA EXCLUÍDA 🗑️')
         .setColor(15158332)
         .setDescription(`O administrador <@${interaction.user.id}> excluiu o tópico de venda **${thread.name}** no fórum <#${forumId}>.`)
+        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
@@ -488,9 +493,10 @@ export async function handleInteraction(interaction) {
 
       // Log de desconfirmação
       const logEmbed = new EmbedBuilder()
-        .setTitle('↩️ Venda Desconfirmada')
+        .setTitle('↩️ VENDA DESCONFIRMADA ↩️')
         .setColor(3447003)
         .setDescription(`O administrador <@${interaction.user.id}> desconfirmou a venda de <@${vendedorId}> no fórum <#${forumId}>.`)
+        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registrovenda', logEmbed);

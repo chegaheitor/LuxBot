@@ -61,6 +61,7 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
     const canal = interaction.options.getChannel('canal');
     const canalRevogacao = interaction.options.getChannel('canal_revogacao');
     const cargoAdv1 = interaction.options.getRole('cargo_adv_1');
@@ -103,7 +104,7 @@ export async function execute(interaction) {
     saveAdvConfig(config);
 
     const embed = new EmbedBuilder()
-      .setTitle('⚙️ SISTEMA DE ADVERTÊNCIAS CONFIGURADO ⚙️')
+      .setTitle('⚙️ ADVERTÊNCIAS CONFIGURADAS ⚙️')
       .setDescription('As configurações do sistema de advertências foram salvas com sucesso!')
       .setColor(3066993) // Verde
       .addFields(
@@ -114,7 +115,7 @@ export async function execute(interaction) {
         { name: '⚠️ Cargo Adv 3:', value: `${cargoAdv3}`, inline: true },
         { name: '💼 Staffs Autorizados:', value: cargosStaffIds.map(id => `<@&${id}>`).join(', '), inline: false }
       )
-      .setFooter({ text: 'Lux Advertências' })
+      .setFooter({ text: `LuxBot Configuração de Advertências • ${dataAtual} • criado por chegaheitor` })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed], ephemeral: true });

@@ -118,8 +118,9 @@ export async function execute(interaction) {
     }
 
     // Criar Embed de Status do Sistema
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
     const embed = new EmbedBuilder()
-      .setTitle('📊 Painel de Status do Sistema')
+      .setTitle('📊 STATUS DO SISTEMA 📊')
       .setColor(2326507)
       .addFields(
         {
@@ -143,7 +144,7 @@ export async function execute(interaction) {
           inline: false
         }
       )
-      .setFooter({ text: 'Lux Bot Status • Criado por chegaheitor' })
+      .setFooter({ text: `LuxBot Status • ${dataAtual} • criado por chegaheitor` })
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });

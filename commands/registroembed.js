@@ -42,6 +42,7 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
     const canalPainel = interaction.options.getChannel('canal_painel');
     const canalPedidos = interaction.options.getChannel('canal_pedidos');
     const canalLogsNegado = interaction.options.getChannel('canal_logs_negado');
@@ -74,7 +75,7 @@ export async function execute(interaction) {
         'Seja muito bem vindo a Lux!'
       )
       .setColor(2326507)
-      .setFooter({ text: 'Bot criado por chegaheitor © 2026' });
+      .setFooter({ text: `LuxBot Recrutamento • ${dataAtual} • criado por chegaheitor` });
 
     // Guardamos os IDs do canal de pedidos e logs_negado no customId do botão
     const button = new ButtonBuilder()
@@ -104,7 +105,9 @@ export async function execute(interaction) {
 
 // Método para tratar interações relativas a este comando (botões, menus e modais)
 export async function handleInteraction(interaction) {
-  const { customId } = interaction;
+  const customId = interaction.customId;
+  const guild = interaction.guild;
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
 
   // 1. Tratar cliques nos botões
   if (interaction.isButton()) {
@@ -315,7 +318,7 @@ export async function handleInteraction(interaction) {
 
         if (logsChannel) {
           const denialEmbed = new EmbedBuilder()
-            .setTitle('📢 Lux Recrutamento - Status')
+            .setTitle('📢 STATUS DO RECRUTAMENTO 📢')
             .setDescription(
               `Olá <@${userId}>,\n\n` +
               `Agradecemos muito pelo seu interesse em fazer parte da **Lux**, porém o seu pedido de recrutamento foi **negado** no momento. 😔\n\n` +
@@ -323,7 +326,7 @@ export async function handleInteraction(interaction) {
               `Não desanime! Fique de olho em novas oportunidades.`
             )
             .setColor(15158332)
-            .setFooter({ text: 'Lux Recrutamento' })
+            .setFooter({ text: `LuxBot Recrutamento • ${dataAtual} • criado por chegaheitor` })
             .setTimestamp();
 
           await logsChannel.send({ content: `<@${userId}>`, embeds: [denialEmbed] });
@@ -373,7 +376,7 @@ export async function handleInteraction(interaction) {
             `💼 CARGO\n${cargoDesejado}\n\n`
           )
           .setColor(2326507)
-          .setFooter({ text: 'Bot criado por chegaheitor © 2026' });
+          .setFooter({ text: `LuxBot Recrutamento • ${dataAtual} • criado por chegaheitor` });
 
         // Criar select de cargo e botão negar
         const roleSelect = new RoleSelectMenuBuilder()

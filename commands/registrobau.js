@@ -57,6 +57,7 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
     const canal = interaction.options.getChannel('canal');
     const nome = interaction.options.getString('nome');
     
@@ -76,7 +77,7 @@ export async function execute(interaction) {
       .setTitle(`📦 BAÚ: ${nome.toUpperCase()} 📦`)
       .setDescription('**Conteúdo do Baú:**\n*Nenhum item armazenado no momento.*')
       .setColor(12096338) // Cor de madeira terrosa
-      .setFooter({ text: 'Lux Baú • Inventário Controlado' })
+      .setFooter({ text: `LuxBot Baú • ${dataAtual} • criado por chegaheitor` })
       .setTimestamp();
 
     const btnAdicionar = new ButtonBuilder()
@@ -144,6 +145,7 @@ export async function handleInteraction(interaction) {
   const guild = interaction.guild;
   const channelId = interaction.channel.id;
   const messageId = interaction.message ? interaction.message.id : null;
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
 
   // 1. Cliques nos Botões (Adicionar/Retirar)
   if (interaction.isButton()) {
@@ -343,7 +345,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar Log Público no Canal do Baú
         const pubLog = new EmbedBuilder()
-          .setTitle('📥 Item Adicionado ao Baú')
+          .setTitle('📥 ITEM ADICIONADO AO BAÚ 📥')
           .setColor(3066993) // Verde
           .setDescription(`O membro <@${interaction.user.id}> adicionou itens ao baú **${chest.nome}**.`)
           .addFields(
@@ -352,6 +354,7 @@ export async function handleInteraction(interaction) {
             { name: '📉 Estoque Anterior:', value: qtyAnterior.toLocaleString('pt-BR'), inline: true },
             { name: '📈 Novo Estoque Total:', value: qtyNova.toLocaleString('pt-BR'), inline: true }
           )
+          .setFooter({ text: `LuxBot Baú • ${dataAtual} • criado por chegaheitor` })
           .setTimestamp();
 
         await channel.send({ embeds: [pubLog] });
@@ -429,7 +432,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar Log Público no Canal do Baú
         const pubLog = new EmbedBuilder()
-          .setTitle('📤 Item Retirado do Baú')
+          .setTitle('📤 ITEM RETIRADO DO BAÚ 📤')
           .setColor(15158332) // Vermelho
           .setDescription(`O membro <@${interaction.user.id}> retirou itens do baú **${chest.nome}**.`)
           .addFields(
@@ -438,6 +441,7 @@ export async function handleInteraction(interaction) {
             { name: '📈 Estoque Anterior:', value: qtyAnterior.toLocaleString('pt-BR'), inline: true },
             { name: '📉 Estoque Restante:', value: qtyNova.toLocaleString('pt-BR'), inline: true }
           )
+          .setFooter({ text: `LuxBot Baú • ${dataAtual} • criado por chegaheitor` })
           .setTimestamp();
 
         await channel.send({ embeds: [pubLog] });

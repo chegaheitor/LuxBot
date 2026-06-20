@@ -41,6 +41,7 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
     const canal = interaction.options.getChannel('canal');
     const role1 = interaction.options.getRole('cargo_1');
     const role2 = interaction.options.getRole('cargo_2');
@@ -70,7 +71,7 @@ export async function execute(interaction) {
         'Clique no botão **Registrar Ausência** abaixo para abrir o formulário.'
       )
       .setColor(15158332) // Vermelho
-      .setFooter({ text: 'Lux Ausências • Bot por chegaheitor' })
+      .setFooter({ text: `LuxBot Ausência • ${dataAtual} • criado por chegaheitor` })
       .setTimestamp();
 
     const btnNovaAusencia = new ButtonBuilder()
@@ -118,6 +119,7 @@ export async function execute(interaction) {
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
   const channelId = interaction.channel.id;
 
   // 1. Botão Registrar Ausência clicado
@@ -210,7 +212,7 @@ export async function handleInteraction(interaction) {
           { name: 'ℹ️ Status:', value: '🔴 Ausente', inline: true }
         )
         .setColor(15158332) // Vermelho
-        .setFooter({ text: 'Lux Ausências' })
+        .setFooter({ text: `LuxBot Ausência • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       const btnVoltou = new ButtonBuilder()

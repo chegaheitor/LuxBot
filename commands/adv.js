@@ -40,6 +40,7 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
     const config = getAdvConfig();
 
     if (!config) {
@@ -122,7 +123,7 @@ export async function execute(interaction) {
         { name: '📅 Validade:', value: ateQuando, inline: true },
         { name: '💼 Cargo Recebido:', value: roleName, inline: true }
       )
-      .setFooter({ text: 'Lux Advertências' })
+      .setFooter({ text: `LuxBot Advertências • ${dataAtual} • criado por chegaheitor` })
       .setTimestamp();
 
     const btnRevogar = new ButtonBuilder()
@@ -181,6 +182,7 @@ export async function execute(interaction) {
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
 
   // 1. Clique no botão de solicitar revogação
   if (interaction.isButton() && customId === 'adv_solicitar_revogacao_btn') {
@@ -268,7 +270,7 @@ export async function handleInteraction(interaction) {
       }
 
       const reqEmbed = new EmbedBuilder()
-        .setTitle('⚖️ SOLICITAÇÃO DE REVOGAÇÃO DE ADVS')
+        .setTitle('⚖️ SOLICITAÇÃO DE REVOGAÇÃO ⚖️')
         .setDescription(`O membro <@${interaction.user.id}> solicitou análise e revogação de sua advertência.`)
         .setColor(15844367) // Amarelo
         .addFields(
@@ -278,6 +280,7 @@ export async function handleInteraction(interaction) {
           { name: '💬 Motivo alegado para Revogar:', value: motivoSolicitado, inline: false },
           { name: '🔗 Link da ADV original:', value: `[Clique para ir à mensagem](https://discord.com/channels/${guild.id}/${interaction.channel.id}/${originalMessageId})`, inline: false }
         )
+        .setFooter({ text: `LuxBot Advertências • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       const btnAceitar = new ButtonBuilder()
@@ -380,8 +383,9 @@ export async function handleInteraction(interaction) {
       // Atualiza a mensagem do canal de análise de revogações
       const acceptedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
         .setColor(3066993) // Verde
-        .setTitle('⚖️ SOLICITAÇÃO DE REVOGAÇÃO - ACEITA')
-        .addFields({ name: '✅ Decisão:', value: `Aceita por <@${interaction.user.id}> em ${new Date().toLocaleDateString('pt-BR')}` });
+        .setTitle('⚖️ REVOGAÇÃO ACEITA ⚖️')
+        .addFields({ name: '✅ Decisão:', value: `Aceita por <@${interaction.user.id}> em ${new Date().toLocaleDateString('pt-BR')}` })
+        .setFooter({ text: `LuxBot Advertências • ${dataAtual} • criado por chegaheitor` });
 
       await interaction.update({ embeds: [acceptedEmbed], components: [] });
 
@@ -484,11 +488,12 @@ export async function handleInteraction(interaction) {
       // Edita a solicitação no canal de revogações
       const deniedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
         .setColor(15158332) // Vermelho
-        .setTitle('⚖️ SOLICITAÇÃO DE REVOGAÇÃO - NEGADA')
+        .setTitle('⚖️ REVOGAÇÃO NEGADA ⚖️')
         .addFields(
           { name: '❌ Decisão:', value: `Negada por <@${interaction.user.id}> em ${new Date().toLocaleDateString('pt-BR')}` },
           { name: '📝 Motivo da Negação:', value: motivoNegacao, inline: false }
-        );
+        )
+        .setFooter({ text: `LuxBot Advertências • ${dataAtual} • criado por chegaheitor` });
 
       await interaction.update({ embeds: [deniedEmbed], components: [] });
 

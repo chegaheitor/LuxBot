@@ -34,6 +34,7 @@ function getCommandNames() {
 // Constrói o Embed Principal de Logs
 function buildLogConfigEmbed() {
   const commands = getCommandNames();
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
   
   const statusLines = commands.map(cmd => {
     const channelId = getLogChannel(cmd);
@@ -42,7 +43,7 @@ function buildLogConfigEmbed() {
   });
 
   return new EmbedBuilder()
-    .setTitle('📋 CONFIGURAÇÃO DE CANAIS DE LOGS')
+    .setTitle('📋 CONFIGURAÇÃO DE LOGS 📋')
     .setDescription(
       'Associe cada comando a um canal de texto específico para receber os logs de suas ações. ' +
       'Se nenhum canal estiver configurado, os logs daquele comando serão desativados.\n\n' +
@@ -50,7 +51,7 @@ function buildLogConfigEmbed() {
       (statusLines.join('\n') || '*Nenhum comando localizado.*')
     )
     .setColor(3447003)
-    .setFooter({ text: 'Lux Logs Config' })
+    .setFooter({ text: `LuxBot Configuração de Logs • ${dataAtual} • criado por chegaheitor` })
     .setTimestamp();
 }
 
@@ -100,6 +101,7 @@ export async function execute(interaction) {
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
 
   // 1. StringSelectMenu -> Selecionou qual comando quer configurar
   if (customId === 'log_config_select_command') {
@@ -107,12 +109,13 @@ export async function handleInteraction(interaction) {
       const selectedCommand = interaction.values[0];
 
       const embedSelect = new EmbedBuilder()
-        .setTitle(`⚙️ CONFIGURAR LOG: /${selectedCommand}`)
+        .setTitle(`⚙️ CONFIGURAR LOG: /${selectedCommand.toUpperCase()} ⚙️`)
         .setDescription(
           `Selecione abaixo o canal de texto do Discord para onde serão enviados os logs de ações do comando **/${selectedCommand}**.\n\n` +
           `Para desativar os logs deste comando, clique em **Desativar Logs**.`
         )
         .setColor(3447003)
+        .setFooter({ text: `LuxBot Configuração de Logs • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       const channelSelect = new ChannelSelectMenuBuilder()

@@ -21,8 +21,9 @@ export const data = new SlashCommandBuilder()
 // Função auxiliar para construir o Embed Principal
 function buildConfigEmbed() {
   const materiais = getFarmMaterials();
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
   return new EmbedBuilder()
-    .setTitle('⚙️ CONFIGURAÇÃO DE MATERIAIS DE FARM')
+    .setTitle('⚙️ CONFIGURAÇÃO DE MATERIAIS ⚙️')
     .setDescription(
       'Abaixo estão listados os materiais atualmente cadastrados no sistema. ' +
       'Eles aparecerão nos menus de seleção para os membros ao adicionar farms e declarar metas.\n\n' +
@@ -33,7 +34,7 @@ function buildConfigEmbed() {
       value: materiais.map((m, i) => `${i + 1}. **${m}**`).join('\n') || 'Nenhum material cadastrado.'
     })
     .setColor(2326507)
-    .setFooter({ text: 'Lux Farm Config' })
+    .setFooter({ text: `LuxBot Configuração de Farm • ${dataAtual} • criado por chegaheitor` })
     .setTimestamp();
 }
 
@@ -84,6 +85,7 @@ export async function execute(interaction) {
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
 
   // 1. Botão Adicionar Material -> Abre Modal
   if (customId === 'configfarm_btn_adicionar') {
@@ -154,9 +156,10 @@ export async function handleInteraction(interaction) {
       }
 
       const embedRemover = new EmbedBuilder()
-        .setTitle('➖ REMOVER MATERIAL')
+        .setTitle('➖ REMOVER MATERIAL ➖')
         .setDescription('Selecione abaixo o material que deseja excluir da lista de farm e metas.')
         .setColor(15158332)
+        .setFooter({ text: `LuxBot Configuração de Farm • ${dataAtual} • criado por chegaheitor` })
         .setTimestamp();
 
       const options = materiais.map(m => ({
