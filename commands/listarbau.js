@@ -259,8 +259,9 @@ export async function handleInteraction(interaction) {
         }
 
         // Verificar permissão
-        const hasPermission = chest.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId))
-          || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+        const hasPermission = (chest && chest.cargosPermitidosIds && Array.isArray(chest.cargosPermitidosIds))
+          ? chest.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId)) || interaction.member.permissions.has(PermissionFlagsBits.Administrator)
+          : interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
         if (!hasPermission) {
           return await interaction.reply({

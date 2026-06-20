@@ -14,6 +14,16 @@ import {
 import { savePendingRecruta, updateRecrutaStatus, getGlobalRecrutamentoConfig } from '../database.js';
 import { sendLog } from '../logs.js';
 
+function hasRecrutamentoPermission(interaction, config) {
+  if (interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return true;
+  }
+  if (config && config.cargosStaffIds && Array.isArray(config.cargosStaffIds)) {
+    return config.cargosStaffIds.some(roleId => interaction.member.roles.cache.has(roleId));
+  }
+  return false;
+}
+
 export const data = new SlashCommandBuilder()
   .setName('criarrecrutamento')
   .setDescription('Cria o painel de recrutamento no canal configurado no /painelconfig.')
@@ -169,9 +179,7 @@ export async function handleInteraction(interaction) {
 
         // Verificar permissões
         const config = getGlobalRecrutamentoConfig();
-        const hasPermission = config && config.cargosStaffIds 
-          ? config.cargosStaffIds.some(roleId => interaction.member.roles.cache.has(roleId))
-          : interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+        const hasPermission = hasRecrutamentoPermission(interaction, config);
 
         if (!hasPermission) {
           return await interaction.reply({ content: '❌ Você não tem permissão para gerenciar este recrutamento!', ephemeral: true });
@@ -207,9 +215,7 @@ export async function handleInteraction(interaction) {
 
         // Verificar permissões
         const config = getGlobalRecrutamentoConfig();
-        const hasPermission = config && config.cargosStaffIds 
-          ? config.cargosStaffIds.some(roleId => interaction.member.roles.cache.has(roleId))
-          : interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+        const hasPermission = hasRecrutamentoPermission(interaction, config);
 
         if (!hasPermission) {
           return await interaction.reply({ content: '❌ Você não tem permissão para gerenciar este recrutamento!', ephemeral: true });

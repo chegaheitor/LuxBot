@@ -181,11 +181,11 @@ export function hasActiveFarmChannel(donoId) {
 export function addConfirmedFarm(discordId, farmData) {
   const db = getDatabase();
   const recrutas = db.recrutas || [];
-  const index = recrutas.findIndex(r => r.discordId === discordId);
+  let index = recrutas.findIndex(r => r.discordId === discordId);
 
   if (index === -1) {
-    console.warn(`Tentativa de adicionar farm a recruta não cadastrado: ${discordId}`);
-    return false;
+    getOrCreateRecruta(discordId);
+    return addConfirmedFarm(discordId, farmData);
   }
 
   if (!recrutas[index].farms) {
@@ -204,11 +204,11 @@ export function addConfirmedFarm(discordId, farmData) {
 export function addPaidMeta(discordId, metaData) {
   const db = getDatabase();
   const recrutas = db.recrutas || [];
-  const index = recrutas.findIndex(r => r.discordId === discordId);
+  let index = recrutas.findIndex(r => r.discordId === discordId);
 
   if (index === -1) {
-    console.warn(`Tentativa de registrar meta paga a recruta não cadastrado: ${discordId}`);
-    return false;
+    getOrCreateRecruta(discordId);
+    return addPaidMeta(discordId, metaData);
   }
 
   if (!recrutas[index].metasPagas) {

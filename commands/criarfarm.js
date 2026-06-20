@@ -2,6 +2,16 @@ import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, But
 import { getRecrutas, saveFarmPanel, getFarmPanel, saveFarmChannel, getFarmChannel, deleteFarmChannel, hasActiveFarmChannel, getActiveFarmChannel, addConfirmedFarm, addPaidMeta, removeConfirmedFarm, removePaidMeta, getFarmMaterials, addMetaDeclarada, getGlobalFarmConfig } from '../database.js';
 import { sendLog } from '../logs.js';
 
+function hasAdminPermission(interaction, channelConfig) {
+  if (interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return true;
+  }
+  if (channelConfig && channelConfig.cargosAdminIds && Array.isArray(channelConfig.cargosAdminIds)) {
+    return channelConfig.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId));
+  }
+  return false;
+}
+
 export const data = new SlashCommandBuilder()
   .setName('criarfarm')
   .setDescription('Cria o painel de solicitação de pasta de farm no canal configurado no /painelconfig.')
@@ -77,14 +87,37 @@ export async function handleInteraction(interaction) {
     if (customId === 'farm_abrir_pasta_btn') {
       try {
         const userId = interaction.user.id;
+        const config = getGlobalFarmConfig();
+
+        if (!config || !config.categoriaId) {
+          return await interaction.reply({
+            content: '❌ Configuração do painel de farm não encontrada ou incompleta no banco de dados.',
+            ephemeral: true
+          });
+        }
 
         // A. Verificar se o membro est├í aprovado no sistema de recrutamento
         const recrutas = getRecrutas();
-        const recruta = recrutas.find(r => r.discordId === userId && r.status === 'ACEITO');
+        let recruta = recrutas.find(r => r.discordId === userId && r.status === 'ACEITO');
+
+        // Permitir que admins/staff criem mesmo sem recrutamento
+        if (!recruta) {
+          const isStaff = (config.cargosAdminIds && Array.isArray(config.cargosAdminIds) && config.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId)))
+            || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+          if (isStaff) {
+            recruta = {
+              discordId: userId,
+              nome: interaction.member.displayName || interaction.user.username,
+              gameId: 'Staff',
+              status: 'ACEITO'
+            };
+          }
+        }
 
         if (!recruta) {
           return await interaction.reply({
-            content: 'ÔØî Voc├¬ precisa estar cadastrado e aprovado no sistema de recrutamento antes de abrir uma pasta de farm!',
+            content: '❌ Você precisa estar cadastrado e aprovado no sistema de recrutamento antes de abrir uma pasta de farm!',
             ephemeral: true
           });
         }
@@ -93,22 +126,24 @@ export async function handleInteraction(interaction) {
         const activeChannel = getActiveFarmChannel(userId);
         if (activeChannel) {
           return await interaction.reply({
-            content: `ÔØî Voc├¬ j├í possui uma pasta de farm ativa! Acesse aqui: <#${activeChannel.canalId}>`,
+            content: `❌ Você já possui uma pasta de farm ativa! Acesse aqui: <#${activeChannel.canalId}>`,
             ephemeral: true
           });
         }
 
-        // C. Obter a configura├º├úo do painel
-        const config = getFarmPanel(interaction.channelId);
-        if (!config) {
+        // C. Verificar se a categoria configurada realmente existe no servidor
+        const guild = interaction.guild;
+        const category = guild.channels.cache.get(config.categoriaId)
+          || await guild.channels.fetch(config.categoriaId).catch(() => null);
+
+        if (!category || category.type !== ChannelType.GuildCategory) {
           return await interaction.reply({
-            content: 'Erro: Configura├º├úo do painel de farm n├úo encontrada no banco de dados.',
+            content: '❌ A categoria de canais de farm configurada não existe no servidor! Peça para um administrador configurar no `/painelconfig`.',
             ephemeral: true
           });
         }
 
         // D. Criar o canal de texto
-        const guild = interaction.guild;
         const channelName = `${recruta.nome} | ${recruta.gameId} - farm`;
 
         const permissionOverwrites = [
@@ -128,18 +163,22 @@ export async function handleInteraction(interaction) {
         ];
 
         // Adicionar cargos admin autorizados
-        config.cargosAdminIds.forEach(roleId => {
-          permissionOverwrites.push({
-            id: roleId,
-            allow: [
-              PermissionFlagsBits.ViewChannel,
-              PermissionFlagsBits.SendMessages,
-              PermissionFlagsBits.EmbedLinks,
-              PermissionFlagsBits.ReadMessageHistory,
-              PermissionFlagsBits.AddReactions
-            ]
+        if (config.cargosAdminIds && Array.isArray(config.cargosAdminIds)) {
+          config.cargosAdminIds.forEach(roleId => {
+            if (roleId) {
+              permissionOverwrites.push({
+                id: roleId,
+                allow: [
+                  PermissionFlagsBits.ViewChannel,
+                  PermissionFlagsBits.SendMessages,
+                  PermissionFlagsBits.EmbedLinks,
+                  PermissionFlagsBits.ReadMessageHistory,
+                  PermissionFlagsBits.AddReactions
+                ]
+              });
+            }
           });
-        });
+        }
 
         const newChannel = await guild.channels.create({
           name: channelName,
@@ -154,42 +193,42 @@ export async function handleInteraction(interaction) {
           donoId: userId,
           donoNome: recruta.nome,
           categoriaId: config.categoriaId,
-          cargosAdminIds: config.cargosAdminIds
+          cargosAdminIds: config.cargosAdminIds || []
         });
 
         // Enviar log de cria├º├úo de canal de farm
         const logEmbed = new EmbedBuilder()
-          .setTitle('­ƒôü Pasta de Farm Criada')
+          .setTitle('📂 Pasta de Farm Criada')
           .setColor(3066993)
-          .setDescription(`O usu├írio <@${userId}> (${userId}) abriu uma nova pasta de farm.`)
-          .addFields({ name: '­ƒôü Canal Criado:', value: `${newChannel} (${newChannel.id})` })
+          .setDescription(`O usuário <@${userId}> (${userId}) abriu uma nova pasta de farm.`)
+          .addFields({ name: '📂 Canal Criado:', value: `${newChannel} (${newChannel.id})` })
           .setTimestamp();
         await sendLog(interaction.client, guild, 'registrofarm', logEmbed);
 
         // F. Enviar embed de boas-vindas no novo canal
         const farmWelcomeEmbed = new EmbedBuilder()
-          .setTitle(`­ƒôï FARM: ${recruta.nome.toUpperCase()} ­ƒôï`)
-          .setDescription('Nesta pasta voc├¬ ir├í colocar o farm que fizer.')
+          .setTitle(`📂 FARM: ${recruta.nome.toUpperCase()} 📂`)
+          .setDescription('Nesta pasta você irá colocar o farm que fizer.')
           .setColor(2326507)
-          .setFooter({ text: `LuxBot Farm ÔÇó ${dataAtual} ÔÇó criado por chegaheitor` });
+          .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
 
         const btnAdd = new ButtonBuilder()
           .setCustomId('farm_adicionar_btn')
           .setLabel('Adicionar Farm')
           .setStyle(ButtonStyle.Primary)
-          .setEmoji('­ƒî¥');
+          .setEmoji('🌾');
 
         const btnMeta = new ButtonBuilder()
           .setCustomId('farm_bati_meta_btn')
           .setLabel('Bati a Meta')
           .setStyle(ButtonStyle.Success)
-          .setEmoji('Ô£¿');
+          .setEmoji('🌟');
 
         const btnDelete = new ButtonBuilder()
           .setCustomId('farm_apagar_pasta_btn')
           .setLabel('Apagar pasta de meta')
           .setStyle(ButtonStyle.Danger)
-          .setEmoji('­ƒùæ´©Å');
+          .setEmoji('🗑️');
 
         const row = new ActionRowBuilder().addComponents(btnAdd, btnMeta, btnDelete);
 
@@ -245,11 +284,9 @@ export async function handleInteraction(interaction) {
         const quantidade = parts[2];
         const dataStr = parts[3];
 
-        // Verificar permiss├Áes
+        // Verificar permissões
         const channelConfig = getFarmChannel(interaction.channelId);
-        const hasPermission = channelConfig && channelConfig.cargosAdminIds
-          ? channelConfig.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
-          : interaction.member.permissions.has('Administrator');
+        const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
           return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para confirmar este farm!', ephemeral: true });
@@ -335,11 +372,9 @@ export async function handleInteraction(interaction) {
         const quantidade = parts[2];
         const dataStr = parts[3];
 
-        // Verificar permiss├Áes
+        // Verificar permissões
         const channelConfig = getFarmChannel(interaction.channelId);
-        const hasPermission = channelConfig && channelConfig.cargosAdminIds
-          ? channelConfig.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
-          : interaction.member.permissions.has('Administrator');
+        const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
           return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para desconfirmar este farm!', ephemeral: true });
@@ -476,11 +511,9 @@ export async function handleInteraction(interaction) {
       try {
         const donoId = customId.replace('farm_pagar_meta_btn_', '');
 
-        // Verificar permiss├úo
+        // Verificar permissão
         const channelConfig = getFarmChannel(interaction.channelId);
-        const hasPermission = channelConfig && channelConfig.cargosAdminIds
-          ? channelConfig.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
-          : interaction.member.permissions.has('Administrator');
+        const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
           return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para gerenciar esta meta!', ephemeral: true });
@@ -526,11 +559,9 @@ export async function handleInteraction(interaction) {
       try {
         const donoId = customId.replace('farm_desconfirmar_meta_btn_', '');
 
-        // Verificar permiss├úo
+        // Verificar permissão
         const channelConfig = getFarmChannel(interaction.channelId);
-        const hasPermission = channelConfig && channelConfig.cargosAdminIds
-          ? channelConfig.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
-          : interaction.member.permissions.has('Administrator');
+        const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
           return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para desconfirmar esta meta!', ephemeral: true });
@@ -614,11 +645,9 @@ export async function handleInteraction(interaction) {
       try {
         const donoId = customId.replace('farm_voltar_pendente_meta_btn_', '');
 
-        // Verificar permiss├úo
+        // Verificar permissão
         const channelConfig = getFarmChannel(interaction.channelId);
-        const hasPermission = channelConfig && channelConfig.cargosAdminIds
-          ? channelConfig.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
-          : interaction.member.permissions.has('Administrator');
+        const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
           return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para redefinir esta meta!', ephemeral: true });
@@ -705,11 +734,9 @@ export async function handleInteraction(interaction) {
       try {
         const donoId = customId.replace('farm_meta_incompleta_btn_', '');
 
-        // Verificar permiss├úo
+        // Verificar permissão
         const channelConfig = getFarmChannel(interaction.channelId);
-        const hasPermission = channelConfig && channelConfig.cargosAdminIds
-          ? channelConfig.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
-          : interaction.member.permissions.has('Administrator');
+        const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
           return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para gerenciar esta meta!', ephemeral: true });
@@ -738,11 +765,9 @@ export async function handleInteraction(interaction) {
     // Bot├úo Apagar Pasta de Farm (Admin)
     if (customId === 'farm_apagar_pasta_btn') {
       try {
-        // Verificar permiss├úo
+        // Verificar permissão
         const channelConfig = getFarmChannel(interaction.channelId);
-        const hasPermission = channelConfig && channelConfig.cargosAdminIds
-          ? channelConfig.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
-          : interaction.member.permissions.has('Administrator');
+        const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
           return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para apagar esta pasta!', ephemeral: true });
@@ -771,11 +796,9 @@ export async function handleInteraction(interaction) {
     // Bot├úo Confirmar Apagar Canal (Admin)
     if (customId === 'farm_confirmar_apagar_btn') {
       try {
-        // Verificar permiss├úo
+        // Verificar permissão
         const channelConfig = getFarmChannel(interaction.channelId);
-        const hasPermission = channelConfig && channelConfig.cargosAdminIds
-          ? channelConfig.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))
-          : interaction.member.permissions.has('Administrator');
+        const hasPermission = hasAdminPermission(interaction, channelConfig);
 
         if (!hasPermission) {
           return await interaction.reply({ content: 'ÔØî Voc├¬ n├úo tem permiss├úo para executar esta a├º├úo!', ephemeral: true });

@@ -10,8 +10,18 @@ import {
   TextInputStyle, 
   ChannelType 
 } from 'discord.js';
-import { getGlobalVendaConfig, addVenda } from '../database.js';
+import { getGlobalVendaConfig, addVenda, getVendaPanel } from '../database.js';
 import { sendLog } from '../logs.js';
+
+function hasVendaPermission(interaction, config) {
+  if (interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return true;
+  }
+  if (config && config.cargosPermitidosIds && Array.isArray(config.cargosPermitidosIds)) {
+    return config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId));
+  }
+  return false;
+}
 
 export const data = new SlashCommandBuilder()
   .setName('criarvenda')
@@ -111,8 +121,7 @@ export async function handleInteraction(interaction) {
       }
 
       // Verificar permiss├úo de cargos
-      const hasPermission = config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId))
-        || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+      const hasPermission = hasVendaPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
@@ -294,9 +303,7 @@ export async function handleInteraction(interaction) {
       const forumId = interaction.channel.parentId;
 
       const config = getVendaPanel(forumId);
-      const hasPermission = config && config.cargosPermitidosIds
-        ? config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId))
-        : interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+      const hasPermission = hasVendaPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
@@ -357,9 +364,7 @@ export async function handleInteraction(interaction) {
       const forumId = interaction.channel.parentId;
 
       const config = getVendaPanel(forumId);
-      const hasPermission = config && config.cargosPermitidosIds
-        ? config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId))
-        : interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+      const hasPermission = hasVendaPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({
@@ -398,9 +403,7 @@ export async function handleInteraction(interaction) {
       const forumId = interaction.channel.parentId;
 
       const config = getVendaPanel(forumId);
-      const hasPermission = config && config.cargosPermitidosIds
-        ? config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId))
-        : interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+      const hasPermission = hasVendaPermission(interaction, config);
 
       if (!hasPermission) {
         return await interaction.reply({

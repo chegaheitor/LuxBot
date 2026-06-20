@@ -27,12 +27,12 @@ export async function execute(interaction) {
 
     if (!config) {
       return await interaction.reply({
-        content: '❌ O sistema de advertências não está configurado! Peça para um administrador configurar usando o comando `/configadv`.',
+        content: '❌ O sistema de advertências não está configurado! Peça para um administrador configurar no `/painelconfig`.',
         ephemeral: true
       });
     }
 
-    const hasPermission = config.cargosStaffIds.some(roleId => interaction.member.roles.cache.has(roleId))
+    const hasPermission = (config.cargosStaffIds && Array.isArray(config.cargosStaffIds) && config.cargosStaffIds.some(roleId => interaction.member.roles.cache.has(roleId)))
       || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
     if (!hasPermission) {

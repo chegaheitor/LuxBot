@@ -100,7 +100,7 @@ export async function handleInteraction(interaction) {
       }
 
       // Verificar permissão de cargos
-      const hasPermission = (config.cargosPermitidosIds && config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId)))
+      const hasPermission = (config.cargosPermitidosIds && Array.isArray(config.cargosPermitidosIds) && config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId)))
         || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
       if (!hasPermission) {
@@ -226,7 +226,7 @@ export async function handleInteraction(interaction) {
       const config = getGlobalAusenciaConfig();
 
       const hasPermission = interaction.user.id === ausenteUserId
-        || (config && config.cargosPermitidosIds && config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId)))
+        || (config && config.cargosPermitidosIds && Array.isArray(config.cargosPermitidosIds) && config.cargosPermitidosIds.some(roleId => interaction.member.roles.cache.has(roleId)))
         || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
 
       if (!hasPermission) {
