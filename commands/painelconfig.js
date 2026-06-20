@@ -961,10 +961,22 @@ export async function handleInteraction(interaction) {
     return await showSimpleModuleMenu(interaction, moduleName);
   }
 }
-
-// ========================================================
+   // ========================================================
 // FUNÇÕES AUXILIARES DE RENDERIZAÇÃO DE MENUS
 // ========================================================
+
+// Helper para atualizar a mensagem do painel de forma flexível (com ou sem ephemeral)
+async function updatePanel(interaction, options) {
+  try {
+    if (interaction.replied || interaction.deferred) {
+      return await interaction.message.edit(options);
+    } else {
+      return await interaction.update(options);
+    }
+  } catch (error) {
+    console.error('Erro ao atualizar painel:', error);
+  }
+}
 
 // Painel de Logs
 async function showLogsMenu(interaction) {
@@ -1001,7 +1013,7 @@ async function showLogsMenu(interaction) {
   const rowSel = new ActionRowBuilder().addComponents(select);
   const rowBtn = new ActionRowBuilder().addComponents(btnVoltar);
 
-  return await interaction.update({ embeds: [embed], components: [rowSel, rowBtn] });
+  return await updatePanel(interaction, { embeds: [embed], components: [rowSel, rowBtn] });
 }
 
 // Painel de Advertências
@@ -1015,9 +1027,13 @@ async function showAdvMenu(interaction) {
     ? adv.cargosStaffIds.map(id => `<@&${id}>`).join(', ')
     : '❌ *Não Configurado*';
   
-  const c1Text = adv?.cargo1Id ? `<@&${adv.cargo1Id}>` : '❌';
-  const c2Text = adv?.cargo2Id ? `<@&${adv.cargo2Id}>` : '❌';
-  const c3Text = adv?.cargo3Id ? `<@&${adv.cargo3Id}>` : '❌';
+  const c1Ids = adv?.cargo1Ids || (adv?.cargo1Id ? [adv.cargo1Id] : []);
+  const c2Ids = adv?.cargo2Ids || (adv?.cargo2Id ? [adv.cargo2Id] : []);
+  const c3Ids = adv?.cargo3Ids || (adv?.cargo3Id ? [adv.cargo3Id] : []);
+
+  const c1Text = c1Ids.length > 0 ? c1Ids.map(id => `<@&${id}>`).join(', ') : '❌';
+  const c2Text = c2Ids.length > 0 ? c2Ids.map(id => `<@&${id}>`).join(', ') : '❌';
+  const c3Text = c3Ids.length > 0 ? c3Ids.map(id => `<@&${id}>`).join(', ') : '❌';
 
   const embed = new EmbedBuilder()
     .setTitle('⚖️ CONFIGURAÇÃO DE ADVERTÊNCIAS ⚖️')
@@ -1026,7 +1042,9 @@ async function showAdvMenu(interaction) {
       `• **📢 Canal de Alertas:** ${alertsText}\n` +
       `• **⚖️ Canal de Revogações:** ${revsText}\n` +
       `• **💼 Staffs Autorizados:** ${staffsText}\n` +
-      `• **⚠️ Nível 1:** ${c1Text} | **Nível 2:** ${c2Text} | **Nível 3:** ${c3Text}`
+      `• **⚠️ Nível 1:** ${c1Text}\n` +
+      `• **⚠️ Nível 2:** ${c2Text}\n` +
+      `• **⚠️ Nível 3:** ${c3Text}`
     )
     .setColor(15158332)
     .setFooter({ text: `LuxBot Advertências • ${dataAtual} • criado por chegaheitor` });
@@ -1040,7 +1058,7 @@ async function showAdvMenu(interaction) {
   const row1 = new ActionRowBuilder().addComponents(btnChAlerts, btnChRevs, btnStaff, btnCargos);
   const row2 = new ActionRowBuilder().addComponents(btnVoltar);
 
-  return await interaction.update({ embeds: [embed], components: [row1, row2] });
+  return await updatePanel(interaction, { embeds: [embed], components: [row1, row2] });
 }
 
 // Painel de Farm
@@ -1076,7 +1094,7 @@ async function showFarmMenu(interaction) {
   const row1 = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnMaterials, btnCriar);
   const row2 = new ActionRowBuilder().addComponents(btnVoltar);
 
-  return await interaction.update({ embeds: [embed], components: [row1, row2] });
+  return await updatePanel(interaction, { embeds: [embed], components: [row1, row2] });
 }
 
 // Painel de Baús
@@ -1103,7 +1121,7 @@ async function showBauMenu(interaction) {
 
   const row = new ActionRowBuilder().addComponents(btnCriar, btnItems, btnVoltar);
 
-  return await interaction.update({ embeds: [embed], components: [row] });
+  return await updatePanel(interaction, { embeds: [embed], components: [row] });
 }
 
 // Renderizador Genérico para Vendas, Encomendas, Ausências e Recrutamento
@@ -1181,5 +1199,5 @@ async function showSimpleModuleMenu(interaction, moduleName) {
 
   const row = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnCriar, btnVoltar);
 
-  return await interaction.update({ embeds: [embed], components: [row] });
+  return await updatePanel(interaction, { embeds: [embed], components: [row] });
 }

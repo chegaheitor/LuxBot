@@ -68,25 +68,31 @@ export async function execute(interaction) {
     const activeCount = removeWarning(targetUser.id, interaction.user.id, motivo);
 
     // Gerenciamento de cargos
+    const cargo1Ids = config.cargo1Ids || (config.cargo1Id ? [config.cargo1Id] : []);
+    const cargo2Ids = config.cargo2Ids || (config.cargo2Id ? [config.cargo2Id] : []);
+    const cargo3Ids = config.cargo3Ids || (config.cargo3Id ? [config.cargo3Id] : []);
+
     const rolesToRemove = [];
-    let roleToAddId = null;
+    const rolesToAdd = [];
 
     if (activeCount === 0) {
-      rolesToRemove.push(config.cargo1Id, config.cargo2Id, config.cargo3Id);
+      rolesToRemove.push(...cargo1Ids, ...cargo2Ids, ...cargo3Ids);
     } else if (activeCount === 1) {
-      roleToAddId = config.cargo1Id;
-      rolesToRemove.push(config.cargo2Id, config.cargo3Id);
+      rolesToAdd.push(...cargo1Ids);
+      rolesToRemove.push(...cargo2Ids, ...cargo3Ids);
     } else if (activeCount === 2) {
-      roleToAddId = config.cargo2Id;
-      rolesToRemove.push(config.cargo1Id, config.cargo3Id);
+      rolesToAdd.push(...cargo2Ids);
+      rolesToRemove.push(...cargo1Ids, ...cargo3Ids);
     }
 
     // Aplicar alterações de cargos
-    if (roleToAddId) {
-      await member.roles.add(roleToAddId).catch(err => console.error('Erro ao adicionar cargo de advertência:', err));
+    for (const rId of rolesToAdd) {
+      if (rId) {
+        await member.roles.add(rId).catch(err => console.error('Erro ao adicionar cargo de advertência:', err));
+      }
     }
     for (const rId of rolesToRemove) {
-      if (member.roles.cache.has(rId)) {
+      if (rId && member.roles.cache.has(rId)) {
         await member.roles.remove(rId).catch(err => console.error('Erro ao remover cargo de advertência:', err));
       }
     }
@@ -94,9 +100,12 @@ export async function execute(interaction) {
     // Anúncio público no canal de advertências
     const channel = await interaction.guild.channels.fetch(config.canalId).catch(() => null);
     let roleName = 'Nenhum / Removido';
-    if (roleToAddId) {
-      const r = interaction.guild.roles.cache.get(roleToAddId);
-      roleName = r ? `${r}` : 'Cargo Advertência';
+    if (rolesToAdd.length > 0) {
+      const names = rolesToAdd
+        .map(id => interaction.guild.roles.cache.get(id))
+        .filter(r => r)
+        .map(r => `${r}`);
+      if (names.length > 0) roleName = names.join(', ');
     }
 
     const pubEmbed = new EmbedBuilder()
