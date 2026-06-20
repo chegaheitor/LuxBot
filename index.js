@@ -58,7 +58,22 @@ client.once(Events.ClientReady, c => {
 
 // Tratar todas as interações
 client.on(Events.InteractionCreate, async interaction => {
-  // 1. Tratar comandos slash
+  // 1. Tratar autocomplete de comandos slash
+  if (interaction.isAutocomplete()) {
+    const command = client.commands.get(interaction.commandName);
+    if (!command) return;
+
+    try {
+      if (typeof command.autocomplete === 'function') {
+        await command.autocomplete(interaction);
+      }
+    } catch (error) {
+      console.error(`Erro ao processar autocomplete do comando /${interaction.commandName}:`, error);
+    }
+    return;
+  }
+
+  // 2. Tratar comandos slash
   if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
@@ -171,6 +186,15 @@ client.on(Events.InteractionCreate, async interaction => {
         await command.handleInteraction(interaction);
       } catch (error) {
         console.error('Erro ao processar interação do configitemsbau:', error);
+      }
+    }
+  } else if (customId.startsWith('adv_')) {
+    const command = client.commands.get('adv');
+    if (command && typeof command.handleInteraction === 'function') {
+      try {
+        await command.handleInteraction(interaction);
+      } catch (error) {
+        console.error('Erro ao processar interação do adv:', error);
       }
     }
   }

@@ -184,10 +184,20 @@ export function generatePerfilEmbed(targetUser, recruta, tab = 'principal') {
       const list = recruta.warnings.slice(-5).reverse().map((w, i) => {
         const dateStr = w.timestamp ? new Date(w.timestamp).toLocaleDateString('pt-BR') : 'Data desconhecida';
         if (w.active) {
-          return `**${i + 1}. ⚠️ Nível ${w.countAfter} / 3** (Aplicado por <@${w.authorId}> em ${dateStr})\n   **Motivo:** ${w.reason}`;
+          let details = `**${i + 1}. ⚠️ Nível ${w.countAfter} / 3** (Aplicado por <@${w.authorId}> em ${dateStr})\n   **Motivo:** ${w.reason}\n   **Validade:** ${w.ateQuando || 'Não informada'}`;
+          if (w.revocationAttempt && w.revocationAttempt.denied) {
+            const deniedDate = w.revocationAttempt.deniedAt ? new Date(w.revocationAttempt.deniedAt).toLocaleDateString('pt-BR') : '';
+            details += `\n   *⚖️ Revogação Negada por <@${w.revocationAttempt.deniedBy}> em ${deniedDate}*\n   *Motivo:* ${w.revocationAttempt.deniedReason}`;
+          }
+          return details;
         } else {
           const removedDateStr = w.removedAt ? new Date(w.removedAt).toLocaleDateString('pt-BR') : '';
-          return `**${i + 1}. ~~⚠️ Nível ${w.countAfter} / 3~~** (Aplicado por <@${w.authorId}>)\n   **❌ REMOVIDA** por <@${w.removedBy}> em ${removedDateStr}\n   **Motivo da Remoção:** *${w.removedReason}*`;
+          if (w.revoked) {
+            const revokedDateStr = w.revokedAt ? new Date(w.revokedAt).toLocaleDateString('pt-BR') : '';
+            return `**${i + 1}. ~~⚠️ Nível ${w.countAfter} / 3~~** (Aplicado por <@${w.authorId}>)\n   **⚖️ REVOGADA** por <@${w.revokedBy}> em ${revokedDateStr}`;
+          } else {
+            return `**${i + 1}. ~~⚠️ Nível ${w.countAfter} / 3~~** (Aplicado por <@${w.authorId}>)\n   **❌ REMOVIDA** por <@${w.removedBy}> em ${removedDateStr}\n   **Motivo da Remoção:** *${w.removedReason}*`;
+          }
         }
       }).join('\n\n');
       embed.addFields({ name: '📝 Registros Recentes:', value: list });

@@ -497,6 +497,11 @@ export function getBau(messageId) {
   return baus.find(b => b.messageId === messageId) || null;
 }
 
+// Obtém todos os baús cadastrados
+export function getBaus() {
+  return getDatabase().baus || [];
+}
+
 // Salva a lista de itens customizados de baú
 export function saveBauItems(items) {
   const db = getDatabase();
@@ -574,6 +579,76 @@ export function removeWarning(userId, removerId, reason) {
   }
   return 0;
 }
+
+// Exclui o baú do banco local `baus`
+export function deleteBau(messageId) {
+  const db = getDatabase();
+  const baus = db.baus || [];
+  const filtered = baus.filter(b => b.messageId !== messageId);
+  return saveDatabase({ ...db, baus: filtered });
+}
+
+// Revoga uma advertência pelo messageId
+export function revokeWarningByMessageId(userId, messageId, staffId) {
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  const index = recrutas.findIndex(r => r.discordId === userId);
+
+  if (index !== -1 && recrutas[index].warnings) {
+    const warning = recrutas[index].warnings.find(w => w.messageId === messageId && w.active);
+    if (warning) {
+      warning.active = false;
+      warning.revoked = true;
+      warning.revokedBy = staffId;
+      warning.revokedAt = new Date().toISOString();
+
+      const activeWarningsCount = recrutas[index].warnings.filter(w => w.active).length;
+
+      saveDatabase({ ...db, recrutas });
+      return activeWarningsCount;
+    }
+  }
+  return null;
+}
+
+// Registra negação de revogação de advertência
+export function denyWarningRevocation(userId, messageId, staffId, reason) {
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  const index = recrutas.findIndex(r => r.discordId === userId);
+
+  if (index !== -1 && recrutas[index].warnings) {
+    const warning = recrutas[index].warnings.find(w => w.messageId === messageId);
+    if (warning) {
+      warning.revocationAttempt = {
+        denied: true,
+        deniedBy: staffId,
+        deniedReason: reason,
+        deniedAt: new Date().toISOString()
+      };
+      saveDatabase({ ...db, recrutas });
+      return true;
+    }
+  }
+  return false;
+}
+
+// Busca uma advertência pelo messageId e retorna { recruta, warning }
+export function getWarningByMessageId(messageId) {
+  const db = getDatabase();
+  const recrutas = db.recrutas || [];
+  for (const r of recrutas) {
+    if (r.warnings) {
+      const warning = r.warnings.find(w => w.messageId === messageId);
+      if (warning) {
+        return { recruta: r, warning: warning };
+      }
+    }
+  }
+  return null;
+}
+
+
 
 
 

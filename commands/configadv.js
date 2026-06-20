@@ -9,10 +9,16 @@ import { sendLog } from '../logs.js';
 
 export const data = new SlashCommandBuilder()
   .setName('configadv')
-  .setDescription('Configura o canal de avisos, os cargos de advertência e cargos de Staff autorizados.')
+  .setDescription('Configura canal de avisos, revogações, cargos de advertência e Staff.')
   .addChannelOption(option =>
     option.setName('canal')
       .setDescription('O canal de texto onde os avisos de advertência serão enviados')
+      .setRequired(true)
+      .addChannelTypes(ChannelType.GuildText)
+  )
+  .addChannelOption(option =>
+    option.setName('canal_revogacao')
+      .setDescription('O canal de texto onde as solicitações de revogação serão enviadas')
       .setRequired(true)
       .addChannelTypes(ChannelType.GuildText)
   )
@@ -56,6 +62,7 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction) {
   try {
     const canal = interaction.options.getChannel('canal');
+    const canalRevogacao = interaction.options.getChannel('canal_revogacao');
     const cargoAdv1 = interaction.options.getRole('cargo_adv_1');
     const cargoAdv2 = interaction.options.getRole('cargo_adv_2');
     const cargoAdv3 = interaction.options.getRole('cargo_adv_3');
@@ -67,7 +74,14 @@ export async function execute(interaction) {
 
     if (canal.type !== ChannelType.GuildText) {
       return await interaction.reply({
-        content: '❌ O canal selecionado precisa ser do tipo Texto!',
+        content: '❌ O canal de alertas selecionado precisa ser do tipo Texto!',
+        ephemeral: true
+      });
+    }
+
+    if (canalRevogacao.type !== ChannelType.GuildText) {
+      return await interaction.reply({
+        content: '❌ O canal de revogações selecionado precisa ser do tipo Texto!',
         ephemeral: true
       });
     }
@@ -79,6 +93,7 @@ export async function execute(interaction) {
 
     const config = {
       canalId: canal.id,
+      canalRevogacaoId: canalRevogacao.id,
       cargo1Id: cargoAdv1.id,
       cargo2Id: cargoAdv2.id,
       cargo3Id: cargoAdv3.id,
@@ -93,6 +108,7 @@ export async function execute(interaction) {
       .setColor(3066993) // Verde
       .addFields(
         { name: '📢 Canal de Alertas:', value: `${canal} (${canal.id})`, inline: false },
+        { name: '⚖️ Canal de Revogações:', value: `${canalRevogacao} (${canalRevogacao.id})`, inline: false },
         { name: '⚠️ Cargo Adv 1:', value: `${cargoAdv1}`, inline: true },
         { name: '⚠️ Cargo Adv 2:', value: `${cargoAdv2}`, inline: true },
         { name: '⚠️ Cargo Adv 3:', value: `${cargoAdv3}`, inline: true },
@@ -107,8 +123,10 @@ export async function execute(interaction) {
     const logEmbed = new EmbedBuilder()
       .setTitle('⚙️ Advertências Configurado')
       .setColor(3066993)
-      .setDescription(`O administrador <@${interaction.user.id}> configurou as advertências no canal ${canal}.`)
+      .setDescription(`O administrador <@${interaction.user.id}> configurou as advertências.`)
       .addFields(
+        { name: '📢 Canal Alertas:', value: `${canal}`, inline: true },
+        { name: '⚖️ Canal Revogações:', value: `${canalRevogacao}`, inline: true },
         { name: '⚠️ Cargo 1:', value: `${cargoAdv1}`, inline: true },
         { name: '⚠️ Cargo 2:', value: `${cargoAdv2}`, inline: true },
         { name: '⚠️ Cargo 3:', value: `${cargoAdv3}`, inline: true },
