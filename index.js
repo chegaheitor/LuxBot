@@ -153,6 +153,15 @@ client.on(Events.InteractionCreate, async interaction => {
         console.error('Erro ao processar interação do perfil:', error);
       }
     }
+  } else if (customId.startsWith('listamembros_')) {
+    const command = client.commands.get('listamembros');
+    if (command && typeof command.handleInteraction === 'function') {
+      try {
+        await command.handleInteraction(interaction);
+      } catch (error) {
+        console.error('Erro ao processar interação do listamembros:', error);
+      }
+    }
   } else if (customId.startsWith('bau_') || customId.startsWith('listarbau_')) {
     try {
       await handleListarbauInteraction(interaction);

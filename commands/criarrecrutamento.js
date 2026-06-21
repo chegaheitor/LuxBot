@@ -12,7 +12,7 @@ import {
   ChannelType, 
   PermissionFlagsBits 
 } from 'discord.js';
-import { savePendingRecruta, updateRecrutaStatus, getGlobalRecrutamentoConfig } from '../database.js';
+import { savePendingRecruta, updateRecrutaStatus, getGlobalRecrutamentoConfig, getRecrutas } from '../database.js';
 import { sendLog } from '../logs.js';
 
 function hasRecrutamentoPermission(interaction, config) {
@@ -272,6 +272,23 @@ export async function handleInteraction(interaction) {
 
         // Tentar adicionar o cargo
         await member.roles.add(cargoId);
+
+        // Alterar o apelido do usuário no servidor para: NOME | ID
+        const recrutas = getRecrutas();
+        const recruta = recrutas.find(r => r.discordId === userId);
+        if (recruta) {
+          const newNickname = `${recruta.nome} | ${recruta.gameId}`;
+          if (newNickname.length <= 32) {
+            await member.setNickname(newNickname).catch(e => console.error('Erro ao alterar apelido:', e));
+          } else {
+            await member.setNickname(newNickname.substring(0, 32)).catch(e => console.error('Erro ao alterar apelido (truncado):', e));
+          }
+        }
+
+        // Retirar o cargo inicial configurado no painelconfig, se aplicável
+        if (config && config.cargoRetirarId) {
+          await member.roles.remove(config.cargoRetirarId).catch(e => console.error('Erro ao retirar cargo inicial:', e));
+        }
 
         const role = interaction.guild.roles.cache.get(cargoId);
         const cargoNome = role ? role.name : 'Cargo Atribuído';

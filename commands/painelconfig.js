@@ -1558,6 +1558,35 @@ export async function handleInteraction(interaction) {
       });
     }
 
+    if (action === 'cargoretirar') {
+      const select = new RoleSelectMenuBuilder()
+        .setCustomId('painelconfig_tempselect_recrutamento_retirar')
+        .setPlaceholder('Escolha o cargo a retirar no aceite...')
+        .setMinValues(1)
+        .setMaxValues(1);
+
+      const btnSave = new ButtonBuilder()
+        .setCustomId('painelconfig_save_recrutamento_retirar')
+        .setLabel('Salvar Cargo')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('💾');
+
+      const btnBack = new ButtonBuilder()
+        .setCustomId('painelconfig_btn_back_simple_recrutamento')
+        .setLabel('Voltar')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('↩️');
+
+      const row = new ActionRowBuilder().addComponents(select);
+      const rowBtns = new ActionRowBuilder().addComponents(btnSave, btnBack);
+
+      return await interaction.update({
+        content: 'Selecione abaixo o cargo que será retirado do usuário no momento em que seu recrutamento for aceito:',
+        embeds: [],
+        components: [row, rowBtns]
+      });
+    }
+
     // Criar Painel
     if (action === 'criar') {
       try {
@@ -1677,6 +1706,8 @@ export async function handleInteraction(interaction) {
       backCustomId = `painelconfig_btn_bau_edit_voltar_${bMsgId}`;
     } else if (type.startsWith('perfil_')) {
       backCustomId = 'painelconfig_btn_back_perfil';
+    } else if (type === 'recrutamento_retirar') {
+      backCustomId = 'painelconfig_btn_back_simple_recrutamento';
     } else if (type.startsWith('simple_roles_')) {
       const mod = type.replace('simple_roles_', '');
       backCustomId = `painelconfig_btn_back_simple_${mod}`;
@@ -1781,6 +1812,19 @@ export async function handleInteraction(interaction) {
         delete tempSelections.get(msgId)[payload];
       }
       return await interaction.followUp({ content: '✅ Cargos de gerenciamento de Farm salvos!', ephemeral: true });
+    }
+
+    if (payload === 'recrutamento_retirar') {
+      const roleId = tempRoles ? tempRoles[0] : (getGlobalRecrutamentoConfig()?.cargoRetirarId || null);
+      const config = getGlobalRecrutamentoConfig() || { canalPainelId: '', canalPedidosId: '', canalLogsNegadoId: '', cargosStaffIds: [] };
+      config.cargoRetirarId = roleId;
+      saveGlobalRecrutamentoConfig(config);
+      await showSimpleModuleMenu(interaction, 'recrutamento');
+      
+      if (tempSelections.has(msgId)) {
+        delete tempSelections.get(msgId)[payload];
+      }
+      return await interaction.followUp({ content: '✅ Cargo a retirar no aceite de recrutamento salvo!', ephemeral: true });
     }
     
     if (payload.startsWith('bau_create_')) {
@@ -2168,12 +2212,14 @@ async function showSimpleModuleMenu(interaction, moduleName) {
     const staffText = config?.cargosStaffIds && config.cargosStaffIds.length > 0
       ? config.cargosStaffIds.map(id => `<@&${id}>`).join(', ')
       : '❌ *Não Configurado*';
+    const cargoRetirarText = config?.cargoRetirarId ? `<@&${config.cargoRetirarId}>` : '❌ *Não Configurado*';
     
     statusLines = 
       `• **Canal do Painel (Bem-vindo):** ${welcomeText}\n` +
       `• **Canal de Pedidos (Aprovação):** ${pedidosText}\n` +
       `• **Canal de Logs Negados:** ${logsText}\n` +
-      `• **Staffs Recrutadores:** ${staffText}`;
+      `• **Staffs Recrutadores:** ${staffText}\n` +
+      `• **Cargo a Retirar no Aceite:** ${cargoRetirarText}`;
   }
 
   const embed = new EmbedBuilder()
@@ -2200,6 +2246,15 @@ async function showSimpleModuleMenu(interaction, moduleName) {
   if (['venda', 'encomenda', 'ausencia'].includes(moduleName)) {
     const btnStaff = new ButtonBuilder().setCustomId(`painelconfig_btn_simple_staff_${moduleName}`).setLabel('Cargos Staff').setStyle(ButtonStyle.Primary).setEmoji('👮');
     const row1 = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnStaff);
+    const row2 = new ActionRowBuilder().addComponents(btnCriar, btnLimpar, btnVoltar);
+    components = [row1, row2];
+  } else if (moduleName === 'recrutamento') {
+    const btnCargoRetirar = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_simple_cargoretirar_recrutamento')
+      .setLabel('Cargo a Retirar')
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('🚫');
+    const row1 = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnCargoRetirar);
     const row2 = new ActionRowBuilder().addComponents(btnCriar, btnLimpar, btnVoltar);
     components = [row1, row2];
   } else {
