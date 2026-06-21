@@ -38,7 +38,9 @@ import {
   getGlobalRecrutamentoConfig,
   saveGlobalRecrutamentoConfig,
   getGlobalPerfilConfig,
-  saveGlobalPerfilConfig
+  saveGlobalPerfilConfig,
+  getTabelaPrecos,
+  saveTabelaPrecos
 } from '../database.js';
 import { sendLog } from '../logs.js';
 
@@ -68,6 +70,7 @@ export function generateMainEmbed() {
   const ausencia = getGlobalAusenciaConfig();
   const recrutamento = getGlobalRecrutamentoConfig();
   const perfil = getGlobalPerfilConfig();
+  const tabelaCount = getTabelaPrecos().length;
 
   const advAlertStr = adv?.canalId ? `<#${adv.canalId}>` : '❌ *Não Configurado*';
   const advRevStr = adv?.canalRevogacaoId ? `<#${adv.canalRevogacaoId}>` : '❌ *Não Configurado*';
@@ -92,7 +95,8 @@ export function generateMainEmbed() {
       `• **📦 Encomendas**: Painel em ${encomendaPanelStr}\n` +
       `• **🔴 Ausências**: Painel em ${ausenciaPanelStr}\n` +
       `• **👥 Recrutamento**: Painel em ${recPanelStr}\n` +
-      `• **👤 Perfil**: Pessoal: \`${perfilPessoalCount}\` cargo(s) | Admins: \`${perfilAdminCount}\` cargo(s)\n`
+      `• **👤 Perfil**: Pessoal: \`${perfilPessoalCount}\` cargo(s) | Admins: \`${perfilAdminCount}\` cargo(s)\n` +
+      `• **🏷️ Tabela de Preços**: \`${tabelaCount}\` item(ns) cadastrado(s)\n`
     )
     .setColor(2326507)
     .setFooter({ text: `LuxBot Configurações • criado por chegaheitor` })
@@ -113,6 +117,7 @@ export function generateMainRow() {
       { label: '🔴 Ausências', description: 'Canal de ausências e cargos autorizados', value: 'painelconfig_mod_ausencia' },
       { label: '👥 Recrutamento', description: 'Canais de inscrição, aprovação e logs', value: 'painelconfig_mod_recrutamento' },
       { label: '👤 Perfil', description: 'Cargos autorizados a alterar informações de perfis', value: 'painelconfig_mod_perfil' },
+      { label: '🏷️ Tabela de Preços', description: 'Criar itens e configurar preços de tabela/parceria', value: 'painelconfig_mod_tabelaprecos' },
       { label: '📋 Logs', description: 'Configurar canais de logs por comando', value: 'painelconfig_mod_logs' }
     ]);
 
@@ -202,6 +207,11 @@ export async function handleInteraction(interaction) {
     // MÓDULO PERFIL
     if (selected === 'painelconfig_mod_perfil') {
       return await showPerfilMenu(interaction);
+    }
+
+    // MÓDULO TABELA DE PREÇOS
+    if (selected === 'painelconfig_mod_tabelaprecos') {
+      return await showTabelaPrecosMenu(interaction);
     }
 
     // MÓDULOS DE FLUXO SIMPLES (Vendas, Encomendas, Ausências, Recrutamento)
@@ -364,6 +374,7 @@ export async function handleInteraction(interaction) {
     if (moduleName === 'farm') return await showFarmMenu(interaction);
     if (moduleName === 'bau') return await showBauMenu(interaction);
     if (moduleName === 'perfil') return await showPerfilMenu(interaction);
+    if (moduleName === 'tabelaprecos') return await showTabelaPrecosMenu(interaction);
     if (moduleName.startsWith('simple_')) {
       const simpleMod = moduleName.replace('simple_', '');
       return await showSimpleModuleMenu(interaction, simpleMod);
@@ -410,6 +421,14 @@ export async function handleInteraction(interaction) {
       saveGlobalPerfilConfig({ cargosPessoalIds: [], cargosAdminIds: [] });
       await interaction.reply({ content: '✅ Todas as configurações de Perfil foram limpas com sucesso!', ephemeral: true });
       return await showPerfilMenu(interaction);
+    }
+
+    if (moduleName === 'tabelaprecos') {
+      const db = getDatabase();
+      db.tabelaPrecos = [];
+      saveDatabase(db);
+      await interaction.reply({ content: '✅ Todas as configurações da Tabela de Preços foram limpas com sucesso!', ephemeral: true });
+      return await showTabelaPrecosMenu(interaction);
     }
 
     if (moduleName.startsWith('simple_')) {
@@ -683,6 +702,10 @@ export async function handleInteraction(interaction) {
       .setEmoji('↩️');
     const rowBack = new ActionRowBuilder().addComponents(btnBack);
 
+    if (action === 'metas') {
+      return await showFarmMetasMenu(interaction);
+    }
+
     if (action === 'channels') {
       const selectPanel = new ChannelSelectMenuBuilder()
         .setCustomId('painelconfig_selectchan_farm_panel')
@@ -809,6 +832,130 @@ export async function handleInteraction(interaction) {
     return await interaction.followUp({ content: `✅ Material **${name}** adicionado com sucesso!`, ephemeral: true });
   }
 
+  if (interaction.isModalSubmit() && customId.startsWith('painelconfig_modal_farm_meta_set_')) {
+    const item = customId.replace('painelconfig_modal_farm_meta_set_', '');
+    const valueStr = interaction.fields.getTextInputValue('meta_value').trim();
+
+    if (!/^\d+$/.test(valueStr)) {
+      return await interaction.reply({
+        content: '❌ A meta de farm deve ser um número inteiro válido (apenas dígitos).',
+        ephemeral: true
+      });
+    }
+
+    const value = parseInt(valueStr, 10);
+    if (value <= 0) {
+      return await interaction.reply({
+        content: '❌ A meta deve ser maior que zero. Se deseja remover a meta, use o menu correspondente.',
+        ephemeral: true
+      });
+    }
+
+    const farmConfig = getGlobalFarmConfig() || { painelCanalId: '', categoriaId: '', cargosAdminIds: [] };
+    if (!farmConfig.metas) farmConfig.metas = {};
+    farmConfig.metas[item] = value;
+    saveGlobalFarmConfig(farmConfig);
+
+    await showFarmMetasMenu(interaction);
+    return await interaction.followUp({ content: `✅ Meta para o material **${item}** configurada para **${value}**!`, ephemeral: true });
+  }
+
+  // ========================================================
+  // MÓDULO TABELA DE PREÇOS: CONFIGURAÇÕES E INTERAÇÕES
+  // ========================================================
+  if (interaction.isButton() && customId === 'painelconfig_btn_tabelaprecos_add') {
+    const modal = new ModalBuilder()
+      .setCustomId('painelconfig_modal_tabelaprecos_add')
+      .setTitle('Adicionar Item na Tabela');
+
+    const nomeInput = new TextInputBuilder()
+      .setCustomId('tabela_item_nome')
+      .setLabel('NOME DO ITEM')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMinLength(2)
+      .setMaxLength(50);
+
+    const precoNormalInput = new TextInputBuilder()
+      .setCustomId('tabela_item_preco_normal')
+      .setLabel('PREÇO NORMAL')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: R$ 50.000 ou 50000')
+      .setRequired(true);
+
+    const precoParceriaInput = new TextInputBuilder()
+      .setCustomId('tabela_item_preco_parceria')
+      .setLabel('PREÇO PARCERIA')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: R$ 40.000 ou 40000')
+      .setRequired(true);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(nomeInput),
+      new ActionRowBuilder().addComponents(precoNormalInput),
+      new ActionRowBuilder().addComponents(precoParceriaInput)
+    );
+
+    return await interaction.showModal(modal);
+  }
+
+  if (interaction.isModalSubmit() && customId === 'painelconfig_modal_tabelaprecos_add') {
+    const nome = interaction.fields.getTextInputValue('tabela_item_nome').trim();
+    const precoNormal = interaction.fields.getTextInputValue('tabela_item_preco_normal').trim();
+    const precoParceria = interaction.fields.getTextInputValue('tabela_item_preco_parceria').trim();
+
+    const tabela = getTabelaPrecos();
+    if (tabela.some(item => item.nome.toLowerCase() === nome.toLowerCase())) {
+      return await interaction.reply({ content: '❌ Já existe um item com este nome na Tabela de Preços!', ephemeral: true });
+    }
+
+    tabela.push({ nome, precoNormal, precoParceria });
+    saveTabelaPrecos(tabela);
+
+    await showTabelaPrecosMenu(interaction);
+    return await interaction.followUp({ content: `✅ Item **${nome}** adicionado à tabela de preços com sucesso!`, ephemeral: true });
+  }
+
+  if (interaction.isButton() && customId === 'painelconfig_btn_tabelaprecos_remove') {
+    const tabela = getTabelaPrecos();
+    if (tabela.length === 0) {
+      return await interaction.reply({ content: '❌ Nenhum item cadastrado para remover.', ephemeral: true });
+    }
+
+    const select = new StringSelectMenuBuilder()
+      .setCustomId('painelconfig_select_tabelaprecos_remove')
+      .setPlaceholder('Escolha o item para remover da tabela...')
+      .addOptions(tabela.map(item => ({ label: item.nome, value: item.nome })));
+
+    const btnBack = new ButtonBuilder()
+      .setCustomId('painelconfig_btn_back_tabelaprecos')
+      .setLabel('Voltar')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️');
+
+    const row = new ActionRowBuilder().addComponents(select);
+    const rowBack = new ActionRowBuilder().addComponents(btnBack);
+
+    return await interaction.update({
+      content: 'Selecione abaixo o item que deseja excluir permanentemente da tabela de preços:',
+      components: [row, rowBack]
+    });
+  }
+
+  if (interaction.isStringSelectMenu() && customId === 'painelconfig_select_tabelaprecos_remove') {
+    const targetName = interaction.values[0];
+    let tabela = getTabelaPrecos();
+    tabela = tabela.filter(item => item.nome !== targetName);
+    saveTabelaPrecos(tabela);
+
+    await showTabelaPrecosMenu(interaction);
+    return await interaction.followUp({ content: `✅ Item **${targetName}** removido da tabela de preços com sucesso!`, ephemeral: true });
+  }
+
+  if (interaction.isButton() && customId === 'painelconfig_btn_back_tabelaprecos') {
+    return await showTabelaPrecosMenu(interaction);
+  }
+
   if (interaction.isButton() && customId === 'painelconfig_btn_farm_materials_remove') {
     const materials = getFarmMaterials();
     if (materials.length === 0) {
@@ -866,6 +1013,37 @@ export async function handleInteraction(interaction) {
 
     await showFarmMenu(interaction);
     return await interaction.followUp({ content: `✅ Material **${target}** removido com sucesso!`, ephemeral: true });
+  }
+
+  if (interaction.isStringSelectMenu() && customId === 'painelconfig_select_farm_meta_set') {
+    const item = interaction.values[0];
+    const modal = new ModalBuilder()
+      .setCustomId(`painelconfig_modal_farm_meta_set_${item}`)
+      .setTitle(`DEFINIR META: ${item.toUpperCase()}`);
+
+    const input = new TextInputBuilder()
+      .setCustomId('meta_value')
+      .setLabel(`Quantidade da Meta para ${item}`)
+      .setPlaceholder('Ex: 1000 (apenas números)')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const row = new ActionRowBuilder().addComponents(input);
+    modal.addComponents(row);
+
+    return await interaction.showModal(modal);
+  }
+
+  if (interaction.isStringSelectMenu() && customId === 'painelconfig_select_farm_meta_remove') {
+    const item = interaction.values[0];
+    const config = getGlobalFarmConfig();
+    if (config) {
+      if (!config.metas) config.metas = {};
+      delete config.metas[item];
+      saveGlobalFarmConfig(config);
+    }
+    await showFarmMetasMenu(interaction);
+    return await interaction.followUp({ content: `✅ Meta para o material **${item}** removida com sucesso!`, ephemeral: true });
   }
 
   // Canais de Farm selecionados
@@ -2100,7 +2278,12 @@ async function showFarmMenu(interaction) {
       `• **📢 Canal do Painel:** ${panelText}\n` +
       `• **📁 Categoria de Canais:** ${catText}\n` +
       `• **💼 Staffs de Farm:** ${staffsText}\n\n` +
-      `• **🌾 Materiais de Farm Ativos:**\n${materials.map((m, i) => `  ${i + 1}. **${m}**`).join('\n') || '  *Nenhum material cadastrado.*'}`
+      `• **🌾 Materiais de Farm Ativos:**\n${materials.map((m, i) => {
+        const metas = farm?.metas || {};
+        const metaVal = metas[m];
+        const metaStr = metaVal ? `(Meta: \`${metaVal}\` un)` : '*(Sem Meta / Farm Livre)*';
+        return `  ${i + 1}. **${m}** ${metaStr}`;
+      }).join('\n') || '  *Nenhum material cadastrado.*'}`
     )
     .setColor(3066993)
     .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
@@ -2108,15 +2291,84 @@ async function showFarmMenu(interaction) {
   const btnChannels = new ButtonBuilder().setCustomId('painelconfig_btn_farm_channels').setLabel('Canais/Categoria').setStyle(ButtonStyle.Primary).setEmoji('📢');
   const btnRoles = new ButtonBuilder().setCustomId('painelconfig_btn_farm_roles').setLabel('Alterar Cargos').setStyle(ButtonStyle.Primary).setEmoji('👥');
   const btnMaterials = new ButtonBuilder().setCustomId('painelconfig_btn_farm_materials').setLabel('Editar Materiais').setStyle(ButtonStyle.Primary).setEmoji('🌾');
+  const btnMetas = new ButtonBuilder().setCustomId('painelconfig_btn_farm_metas').setLabel('Definir Metas').setStyle(ButtonStyle.Primary).setEmoji('🎯');
   const btnCriar = new ButtonBuilder().setCustomId('painelconfig_btn_farm_criar').setLabel('Criar Painel').setStyle(ButtonStyle.Success).setEmoji('➕');
   const btnLimpar = new ButtonBuilder().setCustomId('painelconfig_btn_clear_farm').setLabel('Limpar Config').setStyle(ButtonStyle.Danger).setEmoji('🗑️');
   const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
 
-  const row1 = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnMaterials, btnCriar);
-  const row2 = new ActionRowBuilder().addComponents(btnLimpar, btnVoltar);
+  const row1 = new ActionRowBuilder().addComponents(btnChannels, btnRoles, btnMaterials, btnMetas);
+  const row2 = new ActionRowBuilder().addComponents(btnCriar, btnLimpar, btnVoltar);
 
   return await interaction.update({ embeds: [embed], components: [row1, row2] });
 }
+
+// Painel de Metas de Farm
+async function showFarmMetasMenu(interaction) {
+  const farm = getGlobalFarmConfig() || { painelCanalId: '', categoriaId: '', cargosAdminIds: [], metas: {} };
+  const metas = farm.metas || {};
+  const materials = getFarmMaterials();
+
+  const embed = new EmbedBuilder()
+    .setTitle('🎯 DEFINIR METAS DE FARM 🎯')
+    .setDescription(
+      'Defina ou remova as metas individuais de cada material. Quando o farm de um material atingir a meta, a barra de progresso ficará completa.\n\n' +
+      '**📋 Metas Atuais:**\n' +
+      materials.map((m, i) => {
+        const value = metas[m];
+        return `• **${m}**: ${value ? `\`${value}\` unidades` : '*Sem Meta / Farm Livre*'}`;
+      }).join('\n')
+    )
+    .setColor(3066993)
+    .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
+
+  const setOptions = materials.map(m => ({
+    label: m,
+    value: m,
+    description: `Definir/alterar meta para ${m}`
+  }));
+
+  const selectSet = new StringSelectMenuBuilder()
+    .setCustomId('painelconfig_select_farm_meta_set')
+    .setPlaceholder('🎯 Selecione o material para definir meta...')
+    .addOptions(setOptions);
+
+  const rowSet = new ActionRowBuilder().addComponents(selectSet);
+
+  const materialsWithMetas = materials.filter(m => metas[m]);
+  const rows = [rowSet];
+
+  if (materialsWithMetas.length > 0) {
+    const removeOptions = materialsWithMetas.map(m => ({
+      label: m,
+      value: m,
+      description: `Remover meta de ${m}`
+    }));
+
+    const selectRemove = new StringSelectMenuBuilder()
+      .setCustomId('painelconfig_select_farm_meta_remove')
+      .setPlaceholder('🗑️ Selecione o material para remover a meta...')
+      .addOptions(removeOptions);
+
+    const rowRemove = new ActionRowBuilder().addComponents(selectRemove);
+    rows.push(rowRemove);
+  }
+
+  const btnBack = new ButtonBuilder()
+    .setCustomId('painelconfig_btn_back_farm')
+    .setLabel('Voltar')
+    .setStyle(ButtonStyle.Secondary)
+    .setEmoji('↩️');
+
+  const rowBack = new ActionRowBuilder().addComponents(btnBack);
+  rows.push(rowBack);
+
+  if (interaction.deferred || interaction.replied) {
+    return await interaction.editReply({ content: null, embeds: [embed], components: rows });
+  } else {
+    return await interaction.update({ content: null, embeds: [embed], components: rows });
+  }
+}
+
 
 // Painel de Baús
 async function showBauMenu(interaction) {
@@ -2381,6 +2633,35 @@ async function showEditBauMenu(interaction, messageId) {
   const row2 = new ActionRowBuilder().addComponents(btnItens, btnExcluir, btnVoltar);
 
   const payload = { embeds: [embed], components: [row1, row2] };
+  if (interaction.replied || interaction.deferred) {
+    return await interaction.editReply(payload);
+  } else {
+    return await interaction.update(payload);
+  }
+}
+
+// Painel de Tabela de Preços
+async function showTabelaPrecosMenu(interaction) {
+  const tabela = getTabelaPrecos();
+  const activeItemsStr = tabela.map((item, i) => `  ${i + 1}. **${item.nome}**\n     • Preço Normal: \`${item.precoNormal}\` | Preço Parceria: \`${item.precoParceria}\``).join('\n') || '  *Nenhum item cadastrado.*';
+
+  const embed = new EmbedBuilder()
+    .setTitle('🏷️ CONFIGURAÇÃO DE TABELA DE PREÇOS 🏷️')
+    .setDescription(
+      'Configure os itens e preços da tabela oficial e parceria:\n\n' +
+      `**🏷️ Itens Cadastrados:**\n${activeItemsStr}`
+    )
+    .setColor(16753920) // Laranja / Dourado
+    .setFooter({ text: `LuxBot Tabela de Preços • criado por chegaheitor` });
+
+  const btnAdd = new ButtonBuilder().setCustomId('painelconfig_btn_tabelaprecos_add').setLabel('Adicionar Item').setStyle(ButtonStyle.Success).setEmoji('➕');
+  const btnRemove = new ButtonBuilder().setCustomId('painelconfig_btn_tabelaprecos_remove').setLabel('Remover Item').setStyle(ButtonStyle.Danger).setEmoji('🗑️');
+  const btnLimpar = new ButtonBuilder().setCustomId('painelconfig_btn_clear_tabelaprecos').setLabel('Limpar Config').setStyle(ButtonStyle.Danger).setEmoji('💥');
+  const btnVoltar = new ButtonBuilder().setCustomId('painelconfig_btn_back').setLabel('Voltar').setStyle(ButtonStyle.Secondary).setEmoji('↩️');
+
+  const row = new ActionRowBuilder().addComponents(btnAdd, btnRemove, btnLimpar, btnVoltar);
+
+  const payload = { embeds: [embed], components: [row] };
   if (interaction.replied || interaction.deferred) {
     return await interaction.editReply(payload);
   } else {

@@ -165,7 +165,7 @@ export async function handleInteraction(interaction) {
         }
 
         // D. Criar o canal de texto
-        const channelName = `${recruta.nome} | ${recruta.gameId} - farm`;
+        const channelName = `${recruta.nome} ${recruta.gameId}`;
 
         const permissionOverwrites = [
           {
@@ -224,11 +224,7 @@ export async function handleInteraction(interaction) {
         await sendLog(interaction.client, guild, 'registrofarm', logEmbed);
 
         // F. Enviar embed de boas-vindas no novo canal
-        const farmWelcomeEmbed = new EmbedBuilder()
-          .setTitle(`📂 FARM: ${recruta.nome.toUpperCase()} 📂`)
-          .setDescription('Nesta pasta você irá colocar o farm que fizer.')
-          .setColor(2326507)
-          .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
+        const farmWelcomeEmbed = generateIndividualFarmEmbed(userId, recruta.nome);
 
         const btnAdd = new ButtonBuilder()
           .setCustomId('farm_adicionar_btn')
@@ -250,7 +246,8 @@ export async function handleInteraction(interaction) {
 
         const row = new ActionRowBuilder().addComponents(btnAdd, btnMeta, btnDelete);
 
-        await newChannel.send({ content: `<@${userId}>`, embeds: [farmWelcomeEmbed], components: [row] });
+        const welcomeMsg = await newChannel.send({ content: `<@${userId}>`, embeds: [farmWelcomeEmbed], components: [row] });
+        await welcomeMsg.pin().catch(() => null);
 
         // G. Responder privadamente
         await interaction.reply({
@@ -317,6 +314,9 @@ export async function handleInteraction(interaction) {
           data: dataStr,
           confirmadoPor: interaction.user.id
         });
+
+        // Atualizar o embed principal do canal
+        await updateFarmChannelEmbed(interaction.client, interaction.channelId);
 
         // Adicionar reação ✅ na mensagem original
         await interaction.message.react('✅').catch(() => null);
@@ -400,6 +400,9 @@ export async function handleInteraction(interaction) {
 
         // Remover do banco
         removeConfirmedFarm(userId, item, quantidade, dataStr);
+
+        // Atualizar o embed principal do canal
+        await updateFarmChannelEmbed(interaction.client, interaction.channelId);
 
         // Remover reação ✅
         const reaction = interaction.message.reactions.cache.get('✅');
@@ -516,7 +519,6 @@ export async function handleInteraction(interaction) {
           .setCustomId('farm_bati_meta_select')
           .setPlaceholder('Escolha o recurso da meta batida...')
           .addOptions(options);
-
         const row = new ActionRowBuilder().addComponents(select);
 
         await interaction.reply({
@@ -530,11 +532,12 @@ export async function handleInteraction(interaction) {
       }
     }
 
-    // Botão PAGAR META (Admin)
     // Botão PAGAR META (Admin) - Abre Modal
     if (customId.startsWith('farm_pagar_meta_btn_')) {
       try {
-        const donoId = customId.replace('farm_pagar_meta_btn_', '');
+        const parts = customId.replace('farm_pagar_meta_btn_', '').split('_');
+        const donoId = parts[0];
+        let item = parts[1];
 
         // Verificar permissão
         const channelConfig = getFarmChannel(interaction.channelId);
@@ -544,8 +547,14 @@ export async function handleInteraction(interaction) {
           return await interaction.reply({ content: '❌ Você não tem permissão para gerenciar esta meta!', ephemeral: true });
         }
 
+        // Tenta extrair o item do embed se não estiver no customId
+        if (!item && interaction.message.embeds[0] && interaction.message.embeds[0].description) {
+          const matchItem = interaction.message.embeds[0].description.match(/📦 \*\*Recurso:\*\* ([^\n]+)/);
+          if (matchItem) item = matchItem[1].trim();
+        }
+
         const modal = new ModalBuilder()
-          .setCustomId(`farm_pagar_meta_modal_${donoId}`)
+          .setCustomId(`farm_pagar_meta_modal_${donoId}_${item || 'Outros'}`)
           .setTitle('💩 CONFIRMAR PAGAMENTO 💩');
 
         const valorInput = new TextInputBuilder()
@@ -582,7 +591,9 @@ export async function handleInteraction(interaction) {
     // Botão Desconfirmar Meta (Admin)
     if (customId.startsWith('farm_desconfirmar_meta_btn_')) {
       try {
-        const donoId = customId.replace('farm_desconfirmar_meta_btn_', '');
+        const parts = customId.replace('farm_desconfirmar_meta_btn_', '').split('_');
+        const donoId = parts[0];
+        let item = parts[1];
 
         // Verificar permissão
         const channelConfig = getFarmChannel(interaction.channelId);
@@ -592,8 +603,20 @@ export async function handleInteraction(interaction) {
           return await interaction.reply({ content: '❌ Você não tem permissão para desconfirmar esta meta!', ephemeral: true });
         }
 
+        const originalEmbed = interaction.message.embeds[0];
+        let quantidade = '';
+        if (!item && originalEmbed && originalEmbed.description) {
+          const matchItem = originalEmbed.description.match(/📦 \*\*Recurso:\*\* ([^\n]+)/);
+          if (matchItem) item = matchItem[1].trim();
+          const matchQtd = originalEmbed.description.match(/🔢 \*\*Quantidade:\*\* ([^\n]+)/);
+          if (matchQtd) quantidade = matchQtd[1].trim();
+        }
+
         // Remover do banco
         removePaidMeta(donoId);
+
+        // Atualizar o embed principal do canal para restaurar o progresso
+        await updateFarmChannelEmbed(interaction.client, interaction.channelId);
 
         // Remover reação 💩 (ou 💰 caso o usuário clique em uma antiga)
         const reaction = interaction.message.reactions.cache.find(r => r.emoji.name === '💩' || r.emoji.name === '💰');
@@ -602,10 +625,9 @@ export async function handleInteraction(interaction) {
         }
 
         // Reverter embed
-        const originalEmbed = interaction.message.embeds[0];
         let timestamp = '';
         if (originalEmbed && originalEmbed.description) {
-          const match = originalEmbed.description.match(/📅 \*\*Data da Meta:\*\* ([^\n]+)/);
+          const match = originalEmbed.description.match(/📅 \*\*Data da Meta:\*\* ([^\n]+)/) || originalEmbed.description.match(/📅 \*\*Data\/Hora:\*\* ([^\n]+)/);
           if (match) {
             timestamp = match[1];
           }
@@ -619,6 +641,8 @@ export async function handleInteraction(interaction) {
           .setTitle('✨ META BATIDA ✨')
           .setDescription(
             `👤 **Membro:** <@${donoId}>\n` +
+            (item ? `📦 **Recurso:** ${item}\n` : '') +
+            (quantidade ? `🔢 **Quantidade:** ${quantidade}\n` : '') +
             `📅 **Data/Hora:** ${timestamp}\n\n` +
             `Aguardando a confirmação do pagamento pelos administradores.`
           )
@@ -626,13 +650,13 @@ export async function handleInteraction(interaction) {
           .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
 
         const btnPagar = new ButtonBuilder()
-          .setCustomId(`farm_pagar_meta_btn_${donoId}`)
+          .setCustomId(`farm_pagar_meta_btn_${donoId}_${item || ''}`)
           .setLabel('Pagar Meta')
           .setStyle(ButtonStyle.Success)
           .setEmoji('💩');
 
         const btnIncompleta = new ButtonBuilder()
-          .setCustomId(`farm_meta_incompleta_btn_${donoId}`)
+          .setCustomId(`farm_meta_incompleta_btn_${donoId}_${item || ''}`)
           .setLabel('Meta Incompleta')
           .setStyle(ButtonStyle.Danger)
           .setEmoji('⚠️');
@@ -668,7 +692,9 @@ export async function handleInteraction(interaction) {
     // Botão Voltar a Pendente (Admin)
     if (customId.startsWith('farm_voltar_pendente_meta_btn_')) {
       try {
-        const donoId = customId.replace('farm_voltar_pendente_meta_btn_', '');
+        const parts = customId.replace('farm_voltar_pendente_meta_btn_', '').split('_');
+        const donoId = parts[0];
+        const item = parts[1];
 
         // Verificar permissão
         const channelConfig = getFarmChannel(interaction.channelId);
@@ -681,8 +707,8 @@ export async function handleInteraction(interaction) {
         const originalEmbed = interaction.message.embeds[0];
         let description = '';
         if (originalEmbed && originalEmbed.description) {
-          const parts = originalEmbed.description.split('\n\n❌');
-          description = parts[0] + '\n\nAguardando a confirmação do pagamento pelos administradores.';
+          const partsDesc = originalEmbed.description.split('\n\n❌');
+          description = partsDesc[0] + '\n\nAguardando a confirmação do pagamento pelos administradores.';
         } else {
           description = 'Aguardando a confirmação do pagamento pelos administradores.';
         }
@@ -693,13 +719,13 @@ export async function handleInteraction(interaction) {
           .setDescription(description);
 
         const btnPagar = new ButtonBuilder()
-          .setCustomId(`farm_pagar_meta_btn_${donoId}`)
+          .setCustomId(`farm_pagar_meta_btn_${donoId}_${item || ''}`)
           .setLabel('Pagar Meta')
           .setStyle(ButtonStyle.Success)
           .setEmoji('💩');
 
         const btnIncompleta = new ButtonBuilder()
-          .setCustomId(`farm_meta_incompleta_btn_${donoId}`)
+          .setCustomId(`farm_meta_incompleta_btn_${donoId}_${item || ''}`)
           .setLabel('Meta Incompleta')
           .setStyle(ButtonStyle.Danger)
           .setEmoji('⚠️');
@@ -764,7 +790,9 @@ export async function handleInteraction(interaction) {
     // Botão Meta Incompleta (Admin)
     if (customId.startsWith('farm_meta_incompleta_btn_')) {
       try {
-        const donoId = customId.replace('farm_meta_incompleta_btn_', '');
+        const parts = customId.replace('farm_meta_incompleta_btn_', '').split('_');
+        const donoId = parts[0];
+        const item = parts[1];
 
         // Verificar permissão
         const channelConfig = getFarmChannel(interaction.channelId);
@@ -776,7 +804,7 @@ export async function handleInteraction(interaction) {
 
         // Abre modal para escrever o motivo
         const modal = new ModalBuilder()
-          .setCustomId(`farm_meta_incompleta_modal_${donoId}`)
+          .setCustomId(`farm_meta_incompleta_modal_${donoId}_${item || ''}`)
           .setTitle('⚠️ Meta Incompleta ⚠️');
 
         const motivoInput = new TextInputBuilder()
@@ -961,8 +989,15 @@ export async function handleInteraction(interaction) {
     if (customId.startsWith('farm_adicionar_modal_')) {
       try {
         const item = customId.replace('farm_adicionar_modal_', '');
-        const quantidade = interaction.fields.getTextInputValue('qtd_input');
+        const quantidade = interaction.fields.getTextInputValue('qtd_input').trim();
         const dataStr = interaction.fields.getTextInputValue('data_input');
+
+        if (!/^\d+$/.test(quantidade)) {
+          return await interaction.reply({
+            content: '❌ A quantidade de farm deve ser um número inteiro válido (apenas dígitos).',
+            ephemeral: true
+          });
+        }
 
         const channelConfig = getFarmChannel(interaction.channelId);
         if (!channelConfig) {
@@ -1019,8 +1054,15 @@ export async function handleInteraction(interaction) {
     if (customId.startsWith('farm_bati_meta_modal_')) {
       try {
         const item = customId.replace('farm_bati_meta_modal_', '');
-        const quantidade = interaction.fields.getTextInputValue('qtd_input');
+        const quantidade = interaction.fields.getTextInputValue('qtd_input').trim();
         const dataStr = interaction.fields.getTextInputValue('data_input');
+
+        if (!/^\d+$/.test(quantidade)) {
+          return await interaction.reply({
+            content: '❌ A quantidade da meta deve ser um número inteiro válido (apenas dígitos).',
+            ephemeral: true
+          });
+        }
 
         const channelConfig = getFarmChannel(interaction.channelId);
         if (!channelConfig) {
@@ -1047,13 +1089,13 @@ export async function handleInteraction(interaction) {
           .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
 
         const btnPagar = new ButtonBuilder()
-          .setCustomId(`farm_pagar_meta_btn_${channelConfig.donoId}`)
+          .setCustomId(`farm_pagar_meta_btn_${channelConfig.donoId}_${item}`)
           .setLabel('Pagar Meta')
           .setStyle(ButtonStyle.Success)
           .setEmoji('💩');
 
         const btnIncompleta = new ButtonBuilder()
-          .setCustomId(`farm_meta_incompleta_btn_${channelConfig.donoId}`)
+          .setCustomId(`farm_meta_incompleta_btn_${channelConfig.donoId}_${item}`)
           .setLabel('Meta Incompleta')
           .setStyle(ButtonStyle.Danger)
           .setEmoji('⚠️');
@@ -1089,7 +1131,9 @@ export async function handleInteraction(interaction) {
     // Modal de Pagamento de Meta (Confirmar Pagamento)
     if (customId.startsWith('farm_pagar_meta_modal_')) {
       try {
-        const donoId = customId.replace('farm_pagar_meta_modal_', '');
+        const parts = customId.replace('farm_pagar_meta_modal_', '').split('_');
+        const donoId = parts[0];
+        const item = parts[1];
         const valor = interaction.fields.getTextInputValue('valor_input');
         const dataStr = interaction.fields.getTextInputValue('data_input');
 
@@ -1097,8 +1141,12 @@ export async function handleInteraction(interaction) {
         addPaidMeta(donoId, {
           pagoPor: interaction.user.id,
           valor: valor,
-          data: dataStr
+          data: dataStr,
+          item: item
         });
+
+        // Atualizar o embed principal do canal
+        await updateFarmChannelEmbed(interaction.client, interaction.channelId);
 
         // Reagir com 💩 (conforme requisitado para trocar 💰 por 💩)
         await interaction.message.react('💩').catch(() => null);
@@ -1108,33 +1156,28 @@ export async function handleInteraction(interaction) {
         const dataMensagem = msgDate.toLocaleDateString('pt-BR') + ' às ' + msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
         const originalEmbed = interaction.message.embeds[0];
-        let updatedEmbed;
-        if (originalEmbed) {
-          updatedEmbed = EmbedBuilder.from(originalEmbed)
-            .setTitle('💩 META PAGA 💩')
-            .setColor(3066993)
-            .setDescription(
-              `👤 **Membro:** <@${donoId}>\n` +
-              `📅 **Data da Meta:** ${dataMensagem}\n` +
-              `💰 **Valor Pago:** ${valor}\n` +
-              `💩 **Pago por:** <@${interaction.user.id}>\n` +
-              `­ƒôå **Data do Pagamento:** ${dataStr}`
-            );
-        } else {
-          updatedEmbed = new EmbedBuilder()
-            .setTitle('💩 META PAGA 💩')
-            .setColor(3066993)
-            .setDescription(
-              `👤 **Membro:** <@${donoId}>\n` +
-              `📅 **Data da Meta:** ${dataMensagem}\n` +
-              `💰 **Valor Pago:** ${valor}\n` +
-              `💩 **Pago por:** <@${interaction.user.id}>\n` +
-              `­ƒôå **Data do Pagamento:** ${dataStr}`
-            );
+        let quantidade = '';
+        if (originalEmbed && originalEmbed.description) {
+          const matchQtd = originalEmbed.description.match(/🔢 \*\*Quantidade:\*\* ([^\n]+)/);
+          if (matchQtd) quantidade = matchQtd[1].trim();
         }
 
+        const updatedEmbed = new EmbedBuilder()
+          .setTitle('💩 META PAGA 💩')
+          .setColor(3066993)
+          .setDescription(
+            `👤 **Membro:** <@${donoId}>\n` +
+            (item ? `📦 **Recurso:** ${item}\n` : '') +
+            (quantidade ? `🔢 **Quantidade:** ${quantidade}\n` : '') +
+            `📅 **Data da Meta:** ${dataMensagem}\n` +
+            `💰 **Valor Pago:** ${valor}\n` +
+            `💩 **Pago por:** <@${interaction.user.id}>\n` +
+            `📅 **Data do Pagamento:** ${dataStr}`
+          )
+          .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
+
         const desconfirmMetaBtn = new ButtonBuilder()
-          .setCustomId(`farm_desconfirmar_meta_btn_${donoId}`)
+          .setCustomId(`farm_desconfirmar_meta_btn_${donoId}_${item || ''}`)
           .setLabel('Desconfirmar Meta')
           .setStyle(ButtonStyle.Danger)
           .setEmoji('↩️');
@@ -1169,7 +1212,9 @@ export async function handleInteraction(interaction) {
     // Modal de Justificativa de Meta Incompleta
     if (customId.startsWith('farm_meta_incompleta_modal_')) {
       try {
-        const donoId = customId.replace('farm_meta_incompleta_modal_', '');
+        const parts = customId.replace('farm_meta_incompleta_modal_', '').split('_');
+        const donoId = parts[0];
+        const item = parts[1];
         const motivo = interaction.fields.getTextInputValue('motivo_input');
 
         const now = new Date();
@@ -1200,7 +1245,7 @@ export async function handleInteraction(interaction) {
         }
 
         const voltarBtn = new ButtonBuilder()
-          .setCustomId(`farm_voltar_pendente_meta_btn_${donoId}`)
+          .setCustomId(`farm_voltar_pendente_meta_btn_${donoId}_${item || ''}`)
           .setLabel('Voltar a Pendente')
           .setStyle(ButtonStyle.Primary)
           .setEmoji('↩️');
@@ -1238,5 +1283,85 @@ export async function handleInteraction(interaction) {
         await interaction.reply({ content: 'Erro ao processar erro de meta.', ephemeral: true });
       }
     }
+  }
+}
+
+// Helpers para progresso visual de metas de farm
+export function generateProgressBar(current, target) {
+  if (target <= 0) return '';
+  const pct = Math.min(100, Math.floor((current / target) * 100));
+  const filled = Math.min(10, Math.max(0, Math.floor((current / target) * 10)));
+  const empty = 10 - filled;
+  return `\`${'▰'.repeat(filled) + '▱'.repeat(empty)}\` **${pct}%** (\`${current}/${target}\`)`;
+}
+
+export function generateIndividualFarmEmbed(donoId, donoNome) {
+  const farmConfig = getGlobalFarmConfig() || { metas: {} };
+  const metas = farmConfig.metas || {};
+  const materials = getFarmMaterials();
+  const recrutas = getRecrutas();
+  const recruta = recrutas.find(r => r.discordId === donoId) || { farms: [] };
+  const farms = recruta.farms || [];
+
+  const lines = [];
+  for (const mat of materials) {
+    const target = metas[mat] || 0;
+    const current = farms
+      .filter(f => f.item.toLowerCase() === mat.toLowerCase() && !f.pago)
+      .reduce((sum, f) => sum + parseInt(f.quantidade || 0, 10), 0);
+
+    if (target > 0) {
+      const bar = generateProgressBar(current, target);
+      lines.push(`• **${mat}**: ${bar}`);
+    } else {
+      lines.push(`• **${mat}**: \`${current}\` un *(Sem Meta / Farm Livre)*`);
+    }
+  }
+
+  return new EmbedBuilder()
+    .setTitle(`📂 FARM: ${donoNome.toUpperCase()} 📂`)
+    .setDescription(
+      'Nesta pasta você irá colocar o farm que fizer.\n\n' +
+      '**📊 Progresso de Farm Atual (Não Pago):**\n' +
+      lines.join('\n')
+    )
+    .setColor(2326507)
+    .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
+}
+
+export async function updateFarmChannelEmbed(client, channelId) {
+  try {
+    const channel = await client.channels.fetch(channelId).catch(() => null);
+    if (!channel) return;
+
+    const channelConfig = getFarmChannel(channelId);
+    if (!channelConfig) return;
+
+    const donoId = channelConfig.donoId;
+    const donoNome = channelConfig.donoNome;
+
+    // Buscar nos pins primeiro
+    const pins = await channel.messages.fetchPinned().catch(() => []);
+    let welcomeMsg = pins.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title && m.embeds[0].title.startsWith('📂 FARM:'));
+
+    // Se não achar nos pins, buscar nas últimas mensagens
+    if (!welcomeMsg) {
+      const messages = await channel.messages.fetch({ limit: 50 }).catch(() => []);
+      welcomeMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title && m.embeds[0].title.startsWith('📂 FARM:'));
+      if (welcomeMsg) {
+        // Pin it for future calls
+        await welcomeMsg.pin().catch(() => null);
+      }
+    }
+
+    if (!welcomeMsg) {
+      console.warn(`Mensagem de boas-vindas não localizada no canal ${channelId}`);
+      return;
+    }
+
+    const updatedEmbed = generateIndividualFarmEmbed(donoId, donoNome);
+    await welcomeMsg.edit({ embeds: [updatedEmbed] }).catch(err => console.error('Erro ao editar mensagem de farm:', err));
+  } catch (e) {
+    console.error('Erro em updateFarmChannelEmbed:', e);
   }
 }

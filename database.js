@@ -7,7 +7,7 @@ const DB_PATH = path.resolve('database.json');
 export function initDatabase() {
   const defaultBauItems = ['Ferro', 'Madeira', 'Armas', 'Munição', 'Kits', 'Dinheiro', 'Outros'];
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [], bauItems: defaultBauItems, advConfig: null }, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [], bauItems: defaultBauItems, advConfig: null, tabelaPrecos: [] }, null, 2));
   } else {
     try {
       const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
@@ -23,11 +23,12 @@ export function initDatabase() {
       if (!data.baus) { data.baus = []; modified = true; }
       if (!data.bauItems) { data.bauItems = defaultBauItems; modified = true; }
       if (data.advConfig === undefined) { data.advConfig = null; modified = true; }
+      if (!data.tabelaPrecos) { data.tabelaPrecos = []; modified = true; }
       if (modified) {
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
       }
     } catch (e) {
-      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [], bauItems: defaultBauItems, advConfig: null }, null, 2));
+      fs.writeFileSync(DB_PATH, JSON.stringify({ paineis: [], recrutas: [], farmPaineis: [], farmCanais: [], logChannels: {}, vendaPaineis: [], encomendaPaineis: [], ausenciaPaineis: [], baus: [], bauItems: defaultBauItems, advConfig: null, tabelaPrecos: [] }, null, 2));
     }
   }
 }
@@ -215,8 +216,11 @@ export function addPaidMeta(discordId, metaData) {
     recrutas[index].metasPagas = [];
   }
 
+  const paymentId = 'pay_' + Date.now();
+
   recrutas[index].metasPagas.push({
     ...metaData,
+    paymentId,
     paidAt: new Date().toISOString()
   });
 
@@ -227,6 +231,15 @@ export function addPaidMeta(discordId, metaData) {
     lastMeta.pagoPor = metaData.pagoPor;
     lastMeta.valorPago = metaData.valor;
     lastMeta.pagaAt = new Date().toISOString();
+  }
+
+  // Marcar farms correspondentes não pagos deste item como pagos com este paymentId
+  if (metaData.item && recrutas[index].farms) {
+    recrutas[index].farms.forEach(f => {
+      if (f.item.toLowerCase() === metaData.item.toLowerCase() && !f.pago) {
+        f.pago = paymentId;
+      }
+    });
   }
 
   return saveDatabase({ ...db, recrutas });
@@ -273,7 +286,16 @@ export function removePaidMeta(discordId) {
   }
 
   if (recrutas[index].metasPagas.length > 0) {
-    recrutas[index].metasPagas.pop();
+    const lastPaid = recrutas[index].metasPagas.pop();
+    
+    // Restaurar farms que possuem este paymentId para pago = false (remover chave pago)
+    if (lastPaid && lastPaid.paymentId && recrutas[index].farms) {
+      recrutas[index].farms.forEach(f => {
+        if (f.pago === lastPaid.paymentId) {
+          delete f.pago;
+        }
+      });
+    }
   }
 
   // Também reverter no array geral de metas para histórico do /perfil
@@ -298,7 +320,10 @@ export function saveFarmMaterials(materials) {
 // Retorna a lista de materiais customizados ou o padrão
 export function getFarmMaterials() {
   const db = getDatabase();
-  return db.farmMaterials || ['Ferro', 'Madeira', 'Ouro', 'Dinheiro', 'Outros'];
+  if (!db.farmMaterials || db.farmMaterials.length === 0) {
+    return ['Ferro', 'Madeira', 'Ouro', 'Dinheiro', 'Outros'];
+  }
+  return db.farmMaterials;
 }
 
 // Salva o canal de log associado ao comando
@@ -512,7 +537,10 @@ export function saveBauItems(items) {
 // Retorna a lista de itens do baú
 export function getBauItems() {
   const db = getDatabase();
-  return db.bauItems || ['Ferro', 'Madeira', 'Armas', 'Munição', 'Kits', 'Dinheiro', 'Outros'];
+  if (!db.bauItems || db.bauItems.length === 0) {
+    return ['Ferro', 'Madeira', 'Armas', 'Munição', 'Kits', 'Dinheiro', 'Outros'];
+  }
+  return db.bauItems;
 }
 
 // Salva a configuração de advertências
@@ -742,6 +770,17 @@ export function getGlobalPerfilConfig() {
 export function saveGlobalPerfilConfig(config) {
   const db = getDatabase();
   db.perfilConfig = config;
+  return saveDatabase(db);
+}
+
+export function getTabelaPrecos() {
+  const db = getDatabase();
+  return db.tabelaPrecos || [];
+}
+
+export function saveTabelaPrecos(items) {
+  const db = getDatabase();
+  db.tabelaPrecos = items;
   return saveDatabase(db);
 }
 
