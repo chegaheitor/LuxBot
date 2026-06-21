@@ -24,7 +24,6 @@ export async function sendLog(client, guild, commandName, embedPayload) {
     const embed = embedPayload.toJSON ? embedPayload : new EmbedBuilder(embedPayload);
 
     // 1. Padronização Automática do Rodapé para Logs
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
     const commandDisplayNames = {
       status: 'Status',
       removeradv: 'Remover ADV',
@@ -44,7 +43,7 @@ export async function sendLog(client, guild, commandName, embedPayload) {
       listarbau: 'Listar Baú'
     };
     const displayName = commandDisplayNames[commandName] || commandName;
-    embed.setFooter({ text: `LuxBot ${displayName} • ${dataAtual} • criado por chegaheitor` });
+    embed.setFooter({ text: `LuxBot ${displayName} • criado por chegaheitor` });
 
     // 2. Padronização Automática do Título para Caixa Alta e Emojis Simétricos
     if (embed.data.title) {

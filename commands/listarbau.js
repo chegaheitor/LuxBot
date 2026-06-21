@@ -9,16 +9,26 @@ import {
   TextInputBuilder,
   TextInputStyle
 } from 'discord.js';
-import { getBau, saveBau, getBauItems } from '../database.js';
+import { getBau, saveBau, getBauItems, getRecrutas } from '../database.js';
 import { sendLog } from '../logs.js';
 
 // Trata as interações iniciadas por bau_ (Membros Autorizados)
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
-  const dataAtual = new Date().toLocaleDateString('pt-BR');
 
   if (customId.startsWith('bau_')) {
+    const recrutas = getRecrutas();
+    const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+      recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+    if (!isAccepted) {
+      return await interaction.reply({
+        content: '❌ Você precisa ter seu recrutamento aceito para interagir com o bot!',
+        ephemeral: true
+      });
+    }
+
     const messageId = interaction.message ? interaction.message.id : null;
 
     // Helper para verificar permissão do baú baseado na ação (Adicionar ou Retirar)
@@ -265,7 +275,7 @@ export async function handleInteraction(interaction) {
               { name: '📉 Estoque Anterior:', value: qtyAnterior.toLocaleString('pt-BR'), inline: true },
               { name: '📈 Novo Estoque Total:', value: qtyNova.toLocaleString('pt-BR'), inline: true }
             )
-            .setFooter({ text: `LuxBot Baú • ${dataAtual} • criado por chegaheitor` })
+            .setFooter({ text: `LuxBot Baú • criado por chegaheitor` })
             .setTimestamp();
 
           await channel.send({ embeds: [pubLog] });
@@ -278,7 +288,7 @@ export async function handleInteraction(interaction) {
 
           // Enviar log do bot
           const botLogEmbed = new EmbedBuilder()
-            .setTitle('📥 Depósito em Baú')
+            .setTitle('📥 DEPÓSITO EM BAÚ 📥')
             .setColor(3066993)
             .setDescription(`O membro <@${interaction.user.id}> depositou itens no baú **${chest.nome}** (<#${chest.canalId}>).`)
             .addFields(
@@ -356,7 +366,7 @@ export async function handleInteraction(interaction) {
               { name: '📈 Estoque Anterior:', value: qtyAnterior.toLocaleString('pt-BR'), inline: true },
               { name: '📉 Estoque Restante:', value: qtyNova.toLocaleString('pt-BR'), inline: true }
             )
-            .setFooter({ text: `LuxBot Baú • ${dataAtual} • criado por chegaheitor` })
+            .setFooter({ text: `LuxBot Baú • criado por chegaheitor` })
             .setTimestamp();
 
           await channel.send({ embeds: [pubLog] });
@@ -369,7 +379,7 @@ export async function handleInteraction(interaction) {
 
           // Enviar log do bot
           const botLogEmbed = new EmbedBuilder()
-            .setTitle('📤 Retirada de Baú')
+            .setTitle('📤 RETIRADA DE BAÚ 📤')
             .setColor(15158332)
             .setDescription(`O membro <@${interaction.user.id}> retirou itens do baú **${chest.nome}** (<#${chest.canalId}>).`)
             .addFields(

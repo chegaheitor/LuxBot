@@ -10,7 +10,7 @@ import {
   TextInputStyle,
   ChannelType
 } from 'discord.js';
-import { getGlobalEncomendaConfig, addEncomenda } from '../database.js';
+import { getGlobalEncomendaConfig, addEncomenda, getRecrutas } from '../database.js';
 import { sendLog } from '../logs.js';
 
 function hasEncomendaPermission(interaction, config) {
@@ -40,6 +40,17 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
+    const recrutas = getRecrutas();
+    const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+      recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+    if (!isAccepted) {
+      return await interaction.reply({
+        content: '❌ Você precisa ter seu recrutamento aceito para usar este comando!',
+        ephemeral: true
+      });
+    }
+
     const success = await criarPainelEncomenda(interaction.client, interaction.guild);
     if (success) {
       await interaction.reply({
@@ -64,7 +75,6 @@ export async function execute(interaction) {
 export async function criarPainelEncomenda(client, guild) {
   try {
     const config = getGlobalEncomendaConfig();
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
 
     if (!config || !config.forumCanalId) return false;
 
@@ -79,7 +89,7 @@ export async function criarPainelEncomenda(client, guild) {
         'Clique no botão **Registrar Encomenda** abaixo para abrir o formulário.'
       )
       .setColor(2326507)
-      .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+      .setFooter({ text: `LuxBot Encomendas • criado por chegaheitor` })
       .setTimestamp();
 
     const btnNovaEncomenda = new ButtonBuilder()
@@ -109,7 +119,17 @@ export async function criarPainelEncomenda(client, guild) {
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
-  const dataAtual = new Date().toLocaleDateString('pt-BR');
+
+  const recrutas = getRecrutas();
+  const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+    recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+  if (!isAccepted) {
+    return await interaction.reply({
+      content: '❌ Você precisa ter seu recrutamento aceito para interagir com o bot!',
+      ephemeral: true
+    });
+  }
 
   // 1. Botão Registrar Encomenda clicado
   if (customId === 'encomenda_nova_btn') {
@@ -239,7 +259,7 @@ export async function handleInteraction(interaction) {
           { name: 'ℹ️ Status:', value: '⏳ Pendente', inline: true }
         )
         .setColor(15844367) // Dourado/Amarelo
-        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • criado por chegaheitor` })
         .setTimestamp();
 
       // Botões do Estado Pendente: Iniciar Produção e Excluir Encomenda
@@ -289,7 +309,7 @@ export async function handleInteraction(interaction) {
           { name: '📅 Entrega:', value: dataEntrega, inline: true },
           { name: '🤝 Parceria:', value: parceria, inline: true }
         )
-        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
@@ -363,7 +383,7 @@ export async function handleInteraction(interaction) {
           { name: 'ℹ️ Status:', value: '🏭 Em Produção', inline: true }
         )
         .setColor(3447003) // Azul
-        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • criado por chegaheitor` })
         .setTimestamp();
 
       // Botões do Estado Em Produção: Entregar Encomenda, Voltar a Pendente e Excluir Encomenda
@@ -397,7 +417,7 @@ export async function handleInteraction(interaction) {
         .setTitle('🏭 ENCOMENDA EM PRODUÇÃO 🏭')
         .setColor(3447003)
         .setDescription(`O membro <@${interaction.user.id}> iniciou a produção da encomenda de ${cliente} no fórum <#${forumId}>.`)
-        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
@@ -480,7 +500,7 @@ export async function handleInteraction(interaction) {
           { name: 'ℹ️ Status:', value: '✅ Entregue', inline: true }
         )
         .setColor(3066993) // Verde
-        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • criado por chegaheitor` })
         .setTimestamp();
 
       // Botões do Estado Entregue: Voltar a Pendente, Voltar para Produção e Excluir Encomenda
@@ -514,7 +534,7 @@ export async function handleInteraction(interaction) {
         .setTitle('✅ ENCOMENDA ENTREGUE ✅')
         .setColor(3066993)
         .setDescription(`O membro <@${interaction.user.id}> marcou a encomenda de ${cliente} como entregue no fórum <#${forumId}>.`)
-        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
@@ -583,7 +603,7 @@ export async function handleInteraction(interaction) {
           { name: 'ℹ️ Status:', value: '⏳ Pendente', inline: true }
         )
         .setColor(15844367) // Dourado
-        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • criado por chegaheitor` })
         .setTimestamp();
 
       // Botões do Estado Pendente: Iniciar Produção e Excluir Encomenda
@@ -611,7 +631,7 @@ export async function handleInteraction(interaction) {
         .setTitle('⏳ ENCOMENDA VOLTOU A PENDENTE ⏳')
         .setColor(15844367)
         .setDescription(`O membro <@${interaction.user.id}> redefiniu o status da encomenda de ${cliente} para pendente.`)
-        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
@@ -682,7 +702,7 @@ export async function handleInteraction(interaction) {
           { name: 'ℹ️ Status:', value: '🏭 Em Produção', inline: true }
         )
         .setColor(3447003) // Azul
-        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • criado por chegaheitor` })
         .setTimestamp();
 
       // Botões do Estado Em Produção: Entregar Encomenda, Voltar a Pendente e Excluir Encomenda
@@ -716,7 +736,7 @@ export async function handleInteraction(interaction) {
         .setTitle('🏭 ENCOMENDA VOLTOU A PRODUÇÃO 🏭')
         .setColor(3447003)
         .setDescription(`O membro <@${interaction.user.id}> redefiniu o status da encomenda de ${cliente} para produção.`)
-        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);
@@ -750,7 +770,7 @@ export async function handleInteraction(interaction) {
         .setTitle('🗑️ ENCOMENDA EXCLUÍDA 🗑️')
         .setColor(15158332)
         .setDescription(`O administrador <@${interaction.user.id}> excluiu o tópico de encomenda **${thread.name}** no fórum <#${forumId}>.`)
-        .setFooter({ text: `LuxBot Encomendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Encomendas • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registroencomenda', logEmbed);

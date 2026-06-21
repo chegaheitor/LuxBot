@@ -3,7 +3,7 @@ import {
   EmbedBuilder, 
   PermissionFlagsBits 
 } from 'discord.js';
-import { getAdvConfig, removeWarning, getOrCreateRecruta } from '../database.js';
+import { getAdvConfig, removeWarning, getOrCreateRecruta, getRecrutas } from '../database.js';
 import { sendLog } from '../logs.js';
 
 export const data = new SlashCommandBuilder()
@@ -22,12 +22,22 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
     const config = getAdvConfig();
 
     if (!config) {
       return await interaction.reply({
         content: '❌ O sistema de advertências não está configurado! Peça para um administrador configurar no `/painelconfig`.',
+        ephemeral: true
+      });
+    }
+
+    const recrutas = getRecrutas();
+    const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+      recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+    if (!isAccepted) {
+      return await interaction.reply({
+        content: '❌ Você precisa ter seu recrutamento aceito para usar este comando!',
         ephemeral: true
       });
     }
@@ -125,7 +135,7 @@ export async function execute(interaction) {
         { name: '📝 Motivo da Remoção:', value: motivo, inline: false },
         { name: '💼 Novo Cargo de Adv:', value: roleName, inline: true }
       )
-      .setFooter({ text: `LuxBot Remover ADV • ${dataAtual} • criado por chegaheitor` })
+      .setFooter({ text: `LuxBot Remover ADV • criado por chegaheitor` })
       .setTimestamp();
 
     if (channel) {
@@ -148,7 +158,7 @@ export async function execute(interaction) {
         { name: '🔢 Advertências Ativas:', value: `**${activeCount} / 3**`, inline: true },
         { name: '📝 Motivo da Remoção:', value: motivo, inline: false }
       )
-      .setFooter({ text: `LuxBot Remover ADV • ${dataAtual} • criado por chegaheitor` })
+      .setFooter({ text: `LuxBot Remover ADV • criado por chegaheitor` })
       .setTimestamp();
 
     await sendLog(interaction.client, interaction.guild, 'removeradv', logEmbed);

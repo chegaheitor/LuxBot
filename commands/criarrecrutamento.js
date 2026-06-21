@@ -56,7 +56,6 @@ export async function execute(interaction) {
 export async function criarPainelRecrutamento(client, guild) {
   try {
     const config = getGlobalRecrutamentoConfig();
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
 
     if (!config || !config.canalPainelId || !config.canalPedidosId || !config.canalLogsNegadoId) {
       return false;
@@ -79,7 +78,7 @@ export async function criarPainelRecrutamento(client, guild) {
         'Seja muito bem vindo a Lux!'
       )
       .setColor(2326507)
-      .setFooter({ text: `LuxBot Recrutamento • ${dataAtual} • criado por chegaheitor` })
+      .setFooter({ text: `LuxBot Recrutamento • criado por chegaheitor` })
       .setTimestamp();
 
     // Guardamos os IDs do canal de pedidos e logs_negado no customId do botão
@@ -104,7 +103,6 @@ export async function criarPainelRecrutamento(client, guild) {
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
-  const dataAtual = new Date().toLocaleDateString('pt-BR');
 
   // 1. Tratar cliques nos botões
   if (interaction.isButton()) {
@@ -320,7 +318,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de aprovação
         const logEmbed = new EmbedBuilder()
-          .setTitle('✅ Recrutamento Aprovado')
+          .setTitle('✅ RECRUTAMENTO APROVADO ✅')
           .setColor(3066993)
           .setDescription(`O administrador <@${interaction.user.id}> aprovou o pedido de set do usuário <@${userId}> (${userId}).`)
           .addFields({ name: '💼 Cargo Adicionado:', value: `<@&${cargoId}>` })
@@ -364,7 +362,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de negação
         const logEmbed = new EmbedBuilder()
-          .setTitle('❌ Recrutamento Recusado')
+          .setTitle('❌ RECRUTAMENTO RECUSADO ❌')
           .setColor(15158332)
           .setDescription(`O administrador <@${interaction.user.id}> recusou o pedido de set do usuário <@${userId}> (${userId}).`)
           .addFields({ name: '📝 Motivo da Recusa:', value: motivo })
@@ -384,7 +382,7 @@ export async function handleInteraction(interaction) {
               `Não desanime! Fique de olho em novas oportunidades.`
             )
             .setColor(15158332)
-            .setFooter({ text: `LuxBot Recrutamento • ${dataAtual} • criado por chegaheitor` })
+            .setFooter({ text: `LuxBot Recrutamento • criado por chegaheitor` })
             .setTimestamp();
 
           await logsChannel.send({ content: `<@${userId}>`, embeds: [denialEmbed] });
@@ -434,7 +432,7 @@ export async function handleInteraction(interaction) {
             `💼 CARGO\n${cargoDesejado}\n\n`
           )
           .setColor(2326507)
-          .setFooter({ text: `LuxBot Recrutamento • ${dataAtual} • criado por chegaheitor` })
+          .setFooter({ text: `LuxBot Recrutamento • criado por chegaheitor` })
           .setTimestamp();
 
         // Criar select de cargo e botão negar
@@ -464,7 +462,7 @@ export async function handleInteraction(interaction) {
 
           // Enviar log de novo pedido
           const logEmbed = new EmbedBuilder()
-            .setTitle('📝 Novo Pedido de Set')
+            .setTitle('📝 NOVO PEDIDO DE SET 📝')
             .setColor(3447003)
             .setDescription(`O usuário <@${user.id}> (${user.id}) solicitou recrutamento.`)
             .addFields(

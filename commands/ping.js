@@ -6,8 +6,6 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
-    
     // Responder com cálculo em andamento
     const sent = await interaction.reply({ 
       content: 'Calculando latência... 🔄', 
@@ -34,7 +32,7 @@ export async function execute(interaction) {
         { name: '⚡ Latência da API', value: `\`${apiLatency}ms\``, inline: true }
       )
       .setColor(embedColor)
-      .setFooter({ text: `LuxBot Ping • ${dataAtual} • criado por chegaheitor` })
+      .setFooter({ text: `LuxBot Ping • criado por chegaheitor` })
       .setTimestamp();
 
     await interaction.editReply({

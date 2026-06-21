@@ -10,7 +10,7 @@ import {
   TextInputStyle, 
   ChannelType 
 } from 'discord.js';
-import { getGlobalAusenciaConfig, addAusencia } from '../database.js';
+import { getGlobalAusenciaConfig, addAusencia, getRecrutas } from '../database.js';
 import { sendLog } from '../logs.js';
 
 export const data = new SlashCommandBuilder()
@@ -20,6 +20,17 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
+    const recrutas = getRecrutas();
+    const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+      recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+    if (!isAccepted) {
+      return await interaction.reply({
+        content: '❌ Você precisa ter seu recrutamento aceito para usar este comando!',
+        ephemeral: true
+      });
+    }
+
     const success = await criarPainelAusencia(interaction.client, interaction.guild);
     if (success) {
       await interaction.reply({
@@ -44,7 +55,6 @@ export async function execute(interaction) {
 export async function criarPainelAusencia(client, guild) {
   try {
     const config = getGlobalAusenciaConfig();
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
     
     if (!config || !config.canalId) return false;
 
@@ -59,7 +69,7 @@ export async function criarPainelAusencia(client, guild) {
         'Clique no botão **Registrar Ausência** abaixo para abrir o formulário.'
       )
       .setColor(15158332) // Vermelho
-      .setFooter({ text: `LuxBot Ausência • ${dataAtual} • criado por chegaheitor` })
+      .setFooter({ text: `LuxBot Ausência • criado por chegaheitor` })
       .setTimestamp();
 
     const btnNovaAusencia = new ButtonBuilder()
@@ -86,7 +96,17 @@ export async function criarPainelAusencia(client, guild) {
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
-  const dataAtual = new Date().toLocaleDateString('pt-BR');
+
+  const recrutas = getRecrutas();
+  const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+    recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+  if (!isAccepted) {
+    return await interaction.reply({
+      content: '❌ Você precisa ter seu recrutamento aceito para interagir com o bot!',
+      ephemeral: true
+    });
+  }
 
   // 1. Botão Registrar Ausência clicado
   if (customId === 'ausencia_nova_btn') {
@@ -178,7 +198,7 @@ export async function handleInteraction(interaction) {
           { name: 'ℹ️ Status:', value: '🔴 Ausente', inline: true }
         )
         .setColor(15158332) // Vermelho
-        .setFooter({ text: `LuxBot Ausência • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Ausência • criado por chegaheitor` })
         .setTimestamp();
 
       const btnVoltou = new ButtonBuilder()
@@ -197,7 +217,7 @@ export async function handleInteraction(interaction) {
 
       // Enviar log de nova ausência
       const logEmbed = new EmbedBuilder()
-        .setTitle('🔴 Ausência Registrada')
+        .setTitle('🔴 AUSÊNCIA REGISTRADA 🔴')
         .setColor(15158332)
         .setDescription(`O membro <@${interaction.user.id}> registrou ausência.`)
         .addFields(
@@ -275,7 +295,7 @@ export async function handleInteraction(interaction) {
 
       // Enviar log de retorno de ausência
       const logEmbed = new EmbedBuilder()
-        .setTitle('🏢 Retorno de Ausência')
+        .setTitle('🏢 RETORNO DE AUSÊNCIA 🏢')
         .setColor(3066993)
         .setDescription(`O membro <@${ausenteUserId}> retornou da sua ausência.`)
         .addFields({

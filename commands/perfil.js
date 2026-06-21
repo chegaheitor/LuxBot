@@ -11,7 +11,7 @@ import {
   UserSelectMenuBuilder,
   RoleSelectMenuBuilder
 } from 'discord.js';
-import { getOrCreateRecruta, getActiveFarmChannel, deleteRecruta, updateRecruta, getGlobalPerfilConfig } from '../database.js';
+import { getOrCreateRecruta, getActiveFarmChannel, deleteRecruta, updateRecruta, getGlobalPerfilConfig, getRecrutas } from '../database.js';
 import { sendLog } from '../logs.js';
 
 function hasPerfilPessoalPermission(interaction) {
@@ -48,7 +48,6 @@ export const data = new SlashCommandBuilder()
 // Gera o Embed unificado do perfil
 export function generatePerfilEmbed(targetUser, recruta) {
   const avatarUrl = targetUser.displayAvatarURL({ dynamic: true, size: 256 });
-  const dataAtual = new Date().toLocaleDateString('pt-BR');
   
   const farmChannel = getActiveFarmChannel(targetUser.id);
   const farmFolderStr = farmChannel ? `<#${farmChannel.canalId}>` : '❌ Nenhuma pasta ativa';
@@ -83,7 +82,7 @@ export function generatePerfilEmbed(targetUser, recruta) {
           `• 📦 **Encomendas:** \`${totalEncomendas}\` encomenda(s)`
       }
     )
-    .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` })
+    .setFooter({ text: `LuxBot Perfil • criado por chegaheitor` })
     .setTimestamp();
 
   return embed;
@@ -91,6 +90,17 @@ export function generatePerfilEmbed(targetUser, recruta) {
 
 export async function execute(interaction) {
   try {
+    const recrutas = getRecrutas();
+    const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+      recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+    if (!isAccepted) {
+      return await interaction.reply({
+        content: '❌ Você precisa ter seu recrutamento aceito para usar este comando!',
+        ephemeral: true
+      });
+    }
+
     const targetUser = interaction.options.getUser('membro');
     const recruta = getOrCreateRecruta(targetUser.id, targetUser.tag);
 
@@ -128,7 +138,17 @@ export async function execute(interaction) {
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
-  const dataAtual = new Date().toLocaleDateString('pt-BR');
+
+  const recrutas = getRecrutas();
+  const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+    recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+  if (!isAccepted) {
+    return await interaction.reply({
+      content: '❌ Você precisa ter seu recrutamento aceito para interagir com o bot!',
+      ephemeral: true
+    });
+  }
 
   // Submissão de modais
   if (interaction.isModalSubmit()) {
@@ -348,7 +368,7 @@ export async function handleInteraction(interaction) {
           `**Esta ação é irreversível!** Todos os dados cadastrais, logs de ausências, farms, vendas, encomendas e advertências desse membro serão permanentemente removidos.`
         )
         .setColor(15158332) // Vermelho
-        .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Perfil • criado por chegaheitor` })
         .setTimestamp();
 
       const btnConfirmar = new ButtonBuilder()
@@ -402,7 +422,7 @@ export async function handleInteraction(interaction) {
         .setTitle('✅ PERFIL EXCLUÍDO ✅')
         .setDescription(`O perfil do usuário <@${targetUserId}> foi apagado com sucesso do banco de dados do LuxBot.`)
         .setColor(3066993) // Verde
-        .setFooter({ text: `LuxBot Perfil • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Perfil • criado por chegaheitor` })
         .setTimestamp();
 
       await interaction.update({
@@ -412,7 +432,7 @@ export async function handleInteraction(interaction) {
 
       // Enviar log de exclusão de perfil
       const logEmbed = new EmbedBuilder()
-        .setTitle('🗑️ Perfil Excluído')
+        .setTitle('🗑️ PERFIL EXCLUÍDO 🗑️')
         .setColor(15158332)
         .setDescription(`O administrador/membro <@${interaction.user.id}> excluiu permanentemente a ficha de cadastro de <@${targetUserId}> (${targetUserId}).`)
         .setTimestamp();

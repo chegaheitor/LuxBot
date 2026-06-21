@@ -36,6 +36,7 @@ const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('
 
 console.log('Carregando comandos...');
 for (const file of commandFiles) {
+  if (file === 'listarbau.js') continue;
   const filePath = path.join(commandsPath, file);
   const fileUrl = pathToFileURL(filePath).href;
   

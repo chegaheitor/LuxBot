@@ -19,6 +19,17 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
+    const recrutas = getRecrutas();
+    const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+      recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+    if (!isAccepted) {
+      return await interaction.reply({
+        content: '❌ Você precisa ter seu recrutamento aceito para usar este comando!',
+        ephemeral: true
+      });
+    }
+
     const success = await criarPainelFarm(interaction.client, interaction.guild);
     if (success) {
       await interaction.reply({
@@ -43,7 +54,6 @@ export async function execute(interaction) {
 export async function criarPainelFarm(client, guild) {
   try {
     const config = getGlobalFarmConfig();
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
 
     if (!config || !config.painelCanalId || !config.categoriaId) {
       return false;
@@ -57,7 +67,7 @@ export async function criarPainelFarm(client, guild) {
       .setTitle('📋 PASTA DE FARM 📋')
       .setDescription('Solicite aqui a sua pasta de farm.')
       .setColor(2326507)
-      .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
+      .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
 
     const button = new ButtonBuilder()
       .setCustomId('farm_abrir_pasta_btn')
@@ -78,7 +88,19 @@ export async function criarPainelFarm(client, guild) {
 // Método para tratar interações relativas a este comando
 export async function handleInteraction(interaction) {
   const { customId, guild } = interaction;
-  const dataAtual = new Date().toLocaleDateString('pt-BR');
+
+  const config = getGlobalFarmConfig();
+  const recrutas = getRecrutas();
+  const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+    (config && config.cargosAdminIds && Array.isArray(config.cargosAdminIds) && config.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId))) ||
+    recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+  if (!isAccepted) {
+    return await interaction.reply({
+      content: '❌ Você precisa ter seu recrutamento aceito para interagir com o bot!',
+      ephemeral: true
+    });
+  }
 
   // 1. Tratar botões
   if (interaction.isButton()) {
@@ -194,7 +216,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de criação de canal de farm
         const logEmbed = new EmbedBuilder()
-          .setTitle('📂 Pasta de Farm Criada')
+          .setTitle('📂 PASTA DE FARM CRIADA 📂')
           .setColor(3066993)
           .setDescription(`O usuário <@${userId}> (${userId}) abriu uma nova pasta de farm.`)
           .addFields({ name: '📂 Canal Criado:', value: `${newChannel} (${newChannel.id})` })
@@ -206,7 +228,7 @@ export async function handleInteraction(interaction) {
           .setTitle(`📂 FARM: ${recruta.nome.toUpperCase()} 📂`)
           .setDescription('Nesta pasta você irá colocar o farm que fizer.')
           .setColor(2326507)
-          .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
+          .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
 
         const btnAdd = new ButtonBuilder()
           .setCustomId('farm_adicionar_btn')
@@ -342,7 +364,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de confirmação de farm
         const logEmbed = new EmbedBuilder()
-          .setTitle('✅ Farm Confirmado')
+          .setTitle('✅ FARM CONFIRMADO ✅')
           .setColor(3066993)
           .setDescription(`O administrador <@${interaction.user.id}> confirmou o farm de <@${userId}>.`)
           .addFields(
@@ -429,7 +451,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de desconfirmação de farm
         const logEmbed = new EmbedBuilder()
-          .setTitle('↩️ Farm Desconfirmado')
+          .setTitle('↩️ FARM DESCONFIRMADO ↩️')
           .setColor(3447003)
           .setDescription(`O administrador <@${interaction.user.id}> desconfirmou o farm de <@${userId}>.`)
           .addFields(
@@ -462,7 +484,7 @@ export async function handleInteraction(interaction) {
           desc = `Uma declaração de farm pendente foi excluída por <@${interaction.user.id}>:\n${originalEmbed.description}`;
         }
         const logEmbed = new EmbedBuilder()
-          .setTitle('🗑️ Declaração de Farm Apagada')
+          .setTitle('🗑️ DECLARAÇÃO DE FARM APAGADA 🗑️')
           .setColor(15158332)
           .setDescription(desc)
           .setTimestamp();
@@ -524,7 +546,7 @@ export async function handleInteraction(interaction) {
 
         const modal = new ModalBuilder()
           .setCustomId(`farm_pagar_meta_modal_${donoId}`)
-          .setTitle('💩 Confirmar Pagamento 💩');
+          .setTitle('💩 CONFIRMAR PAGAMENTO 💩');
 
         const valorInput = new TextInputBuilder()
           .setCustomId('valor_input')
@@ -601,7 +623,7 @@ export async function handleInteraction(interaction) {
             `Aguardando a confirmação do pagamento pelos administradores.`
           )
           .setColor(3066993)
-          .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
+          .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
 
         const btnPagar = new ButtonBuilder()
           .setCustomId(`farm_pagar_meta_btn_${donoId}`)
@@ -631,7 +653,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de desconfirmação de meta
         const logEmbed = new EmbedBuilder()
-          .setTitle('↩️ Pagamento de Meta Desconfirmado')
+          .setTitle('↩️ PAGAMENTO DE META DESCONFIRMADO ↩️')
           .setColor(3447003)
           .setDescription(`O administrador <@${interaction.user.id}> desconfirmou o pagamento de meta de <@${donoId}>.`)
           .setTimestamp();
@@ -698,7 +720,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de meta restaurada
         const logEmbed = new EmbedBuilder()
-          .setTitle('↩️ Meta Restaurada para Pendente')
+          .setTitle('↩️ META RESTAURADA PARA PENDENTE ↩️')
           .setColor(3447003)
           .setDescription(`O administrador <@${interaction.user.id}> restaurou o status da meta de <@${donoId}> para pendente.`)
           .setTimestamp();
@@ -726,7 +748,7 @@ export async function handleInteraction(interaction) {
           desc = `Uma declaração de meta batida foi excluída por <@${interaction.user.id}>:\n${originalEmbed.description}`;
         }
         const logEmbed = new EmbedBuilder()
-          .setTitle('🗑️ Declaração de Meta Excluída')
+          .setTitle('🗑️ DECLARAÇÃO DE META EXCLUÍDA 🗑️')
           .setColor(15158332)
           .setDescription(desc)
           .setTimestamp();
@@ -817,7 +839,7 @@ export async function handleInteraction(interaction) {
         // Enviar log antes de deletar o canal
         const donoMencao = channelConfig ? `<@${channelConfig.donoId}>` : 'Desconhecido';
         const logEmbed = new EmbedBuilder()
-          .setTitle('🗑️ Pasta de Farm Excluída')
+          .setTitle('🗑️ PASTA DE FARM EXCLUÍDA 🗑️')
           .setColor(15158332)
           .setDescription(`O administrador <@${interaction.user.id}> excluiu a pasta de farm de ${donoMencao}.`)
           .addFields({ name: '📁 Canal Excluído:', value: `${interaction.channel.name} (${interaction.channelId})` })
@@ -957,7 +979,7 @@ export async function handleInteraction(interaction) {
             `Aguardando confirmação de um administrador.`
           )
           .setColor(2326507)
-          .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
+          .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
 
         const confirmBtn = new ButtonBuilder()
           .setCustomId(`farm_confirmar_btn_${channelConfig.donoId}_${item}_${quantidade}_${dataStr}`)
@@ -977,7 +999,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de farm declarado
         const logEmbed = new EmbedBuilder()
-          .setTitle('🌾 Novo Farm Declarado')
+          .setTitle('🌾 NOVO FARM DECLARADO 🌾')
           .setColor(3447003)
           .setDescription(`O usuário <@${channelConfig.donoId}> declarou um novo farm pendente.`)
           .addFields(
@@ -1022,7 +1044,7 @@ export async function handleInteraction(interaction) {
             `Aguardando a confirmação do pagamento pelos administradores.`
           )
           .setColor(3066993)
-          .setFooter({ text: `LuxBot Farm • ${dataAtual} • criado por chegaheitor` });
+          .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
 
         const btnPagar = new ButtonBuilder()
           .setCustomId(`farm_pagar_meta_btn_${channelConfig.donoId}`)
@@ -1048,7 +1070,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de meta batida
         const logEmbed = new EmbedBuilder()
-          .setTitle('✨ Meta Batida Declarada')
+          .setTitle('✨ META BATIDA DECLARADA ✨')
           .setColor(3447003)
           .setDescription(`O usuário <@${channelConfig.donoId}> declarou que bateu a meta.`)
           .addFields(
@@ -1128,7 +1150,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de pagamento de meta
         const logEmbed = new EmbedBuilder()
-          .setTitle('💩 Meta Confirmada/Paga')
+          .setTitle('💩 META CONFIRMADA/PAGA 💩')
           .setColor(3066993)
           .setDescription(`O administrador <@${interaction.user.id}> marcou como paga a meta de <@${donoId}>.`)
           .addFields(
@@ -1205,7 +1227,7 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de meta incompleta
         const logEmbed = new EmbedBuilder()
-          .setTitle('⚠️ Meta Marcada como Incompleta')
+          .setTitle('⚠️ META MARCADA COMO INCOMPLETA ⚠️')
           .setColor(15158332)
           .setDescription(`O administrador <@${interaction.user.id}> marcou a meta de <@${donoId}> como incompleta.`)
           .addFields({ name: '📝 Motivo:', value: motivo })

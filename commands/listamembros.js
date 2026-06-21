@@ -96,7 +96,7 @@ export async function handleInteraction(interaction) {
       const suffix = lines.length > maxCount ? `\n\n*... e mais ${lines.length - maxCount} membros.*` : '';
 
       const embed = new EmbedBuilder()
-        .setTitle('🟢 MEMBROS DA EQUIPE (CADASTRADOS)')
+        .setTitle('🟢 MEMBROS DA EQUIPE (CADASTRADOS) 🟢')
         .setDescription(`Lista de recrutas ativos e aprovados no banco de dados:\n\n${displayed}${suffix}`)
         .addFields({ name: '📊 Total de Cadastrados:', value: `\`${recrutas.length}\` membros` })
         .setColor(3066993)
@@ -136,7 +136,7 @@ export async function handleInteraction(interaction) {
         : `Membros do servidor que **não possuem** recrutamento no banco:\n\n${displayed}${suffix}`;
 
       const embed = new EmbedBuilder()
-        .setTitle('🔴 MEMBROS NÃO CADASTRADOS')
+        .setTitle('🔴 MEMBROS NÃO CADASTRADOS 🔴')
         .setDescription(description)
         .addFields({ name: '📊 Total Pendente:', value: `\`${unregistered.size}\` membros` })
         .setColor(15158332)

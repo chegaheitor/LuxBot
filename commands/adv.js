@@ -15,7 +15,8 @@ import {
   getOrCreateRecruta, 
   revokeWarningByMessageId, 
   denyWarningRevocation, 
-  getWarningByMessageId 
+  getWarningByMessageId,
+  getRecrutas
 } from '../database.js';
 import { sendLog } from '../logs.js';
 
@@ -40,12 +41,22 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
     const config = getAdvConfig();
 
     if (!config) {
       return await interaction.reply({
         content: '❌ O sistema de advertências não está configurado! Peça para um administrador configurar no `/painelconfig`.',
+        ephemeral: true
+      });
+    }
+
+    const recrutas = getRecrutas();
+    const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+      recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+    if (!isAccepted) {
+      return await interaction.reply({
+        content: '❌ Você precisa ter seu recrutamento aceito para usar este comando!',
         ephemeral: true
       });
     }
@@ -137,7 +148,7 @@ export async function execute(interaction) {
         { name: '📅 Validade:', value: ateQuando, inline: true },
         { name: '💼 Cargo Recebido:', value: roleName, inline: true }
       )
-      .setFooter({ text: `LuxBot Advertências • ${dataAtual} • criado por chegaheitor` })
+      .setFooter({ text: `LuxBot Advertências • criado por chegaheitor` })
       .setTimestamp();
 
     const btnRevogar = new ButtonBuilder()
@@ -170,7 +181,7 @@ export async function execute(interaction) {
 
     // Enviar log de advertência
     const logEmbed = new EmbedBuilder()
-      .setTitle('⚠️ Advertência Aplicada')
+      .setTitle('⚠️ ADVERTÊNCIA APLICADA ⚠️')
       .setColor(15158332)
       .setDescription(`<@${interaction.user.id}> aplicou uma advertência em ${targetUser}.`)
       .addFields(
@@ -192,11 +203,22 @@ export async function execute(interaction) {
   }
 }
 
-// Trata as interações iniciadas por adv_
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
-  const dataAtual = new Date().toLocaleDateString('pt-BR');
+
+  const config = getAdvConfig();
+  const recrutas = getRecrutas();
+  const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+    (config && config.cargosStaffIds && Array.isArray(config.cargosStaffIds) && config.cargosStaffIds.some(roleId => interaction.member.roles.cache.has(roleId))) ||
+    recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+  if (!isAccepted) {
+    return await interaction.reply({
+      content: '❌ Você precisa ter seu recrutamento aceito para interagir com o bot!',
+      ephemeral: true
+    });
+  }
 
   // 1. Clique no botão de solicitar revogação
   if (interaction.isButton() && customId === 'adv_solicitar_revogacao_btn') {
@@ -294,7 +316,7 @@ export async function handleInteraction(interaction) {
           { name: '💬 Motivo alegado para Revogar:', value: motivoSolicitado, inline: false },
           { name: '🔗 Link da ADV original:', value: `[Clique para ir à mensagem](https://discord.com/channels/${guild.id}/${interaction.channel.id}/${originalMessageId})`, inline: false }
         )
-        .setFooter({ text: `LuxBot Advertências • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Advertências • criado por chegaheitor` })
         .setTimestamp();
 
       const btnAceitar = new ButtonBuilder()
@@ -411,13 +433,13 @@ export async function handleInteraction(interaction) {
         .setColor(3066993) // Verde
         .setTitle('⚖️ REVOGAÇÃO ACEITA ⚖️')
         .addFields({ name: '✅ Decisão:', value: `Aceita por <@${interaction.user.id}> em ${new Date().toLocaleDateString('pt-BR')}` })
-        .setFooter({ text: `LuxBot Advertências • ${dataAtual} • criado por chegaheitor` });
+        .setFooter({ text: `LuxBot Advertências • criado por chegaheitor` });
 
       await interaction.update({ embeds: [acceptedEmbed], components: [] });
 
       // Envia log do bot
       const logEmbed = new EmbedBuilder()
-        .setTitle('⚖️ Advertência Revogada por Solicitação')
+        .setTitle('⚖️ ADVERTÊNCIA REVOGADA POR SOLICITAÇÃO ⚖️')
         .setColor(3066993)
         .setDescription(`<@${interaction.user.id}> aceitou a revogação da advertência de <@${warnedUserId}>.`)
         .addFields(
@@ -519,13 +541,13 @@ export async function handleInteraction(interaction) {
           { name: '❌ Decisão:', value: `Negada por <@${interaction.user.id}> em ${new Date().toLocaleDateString('pt-BR')}` },
           { name: '📝 Motivo da Negação:', value: motivoNegacao, inline: false }
         )
-        .setFooter({ text: `LuxBot Advertências • ${dataAtual} • criado por chegaheitor` });
+        .setFooter({ text: `LuxBot Advertências • criado por chegaheitor` });
 
       await interaction.update({ embeds: [deniedEmbed], components: [] });
 
       // Envia log do bot
       const logEmbed = new EmbedBuilder()
-        .setTitle('⚖️ Revogação de Advertência Negada')
+        .setTitle('⚖️ REVOGAÇÃO DE ADVERTÊNCIA NEGADA ⚖️')
         .setColor(15158332)
         .setDescription(`<@${interaction.user.id}> recusou a solicitação de revogação da advertência de <@${warnedUserId}>.`)
         .addFields(

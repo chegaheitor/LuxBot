@@ -10,7 +10,7 @@ import {
   TextInputStyle,
   ChannelType
 } from 'discord.js';
-import { getGlobalVendaConfig, addVenda } from '../database.js';
+import { getGlobalVendaConfig, addVenda, getRecrutas } from '../database.js';
 import { sendLog } from '../logs.js';
 
 function hasVendaPermission(interaction, config) {
@@ -40,6 +40,17 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
+    const recrutas = getRecrutas();
+    const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+      recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+    if (!isAccepted) {
+      return await interaction.reply({
+        content: '❌ Você precisa ter seu recrutamento aceito para usar este comando!',
+        ephemeral: true
+      });
+    }
+
     const success = await criarPainelVenda(interaction.client, interaction.guild);
     if (success) {
       await interaction.reply({
@@ -64,7 +75,6 @@ export async function execute(interaction) {
 export async function criarPainelVenda(client, guild) {
   try {
     const config = getGlobalVendaConfig();
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
 
     if (!config || !config.forumCanalId) return false;
 
@@ -79,7 +89,7 @@ export async function criarPainelVenda(client, guild) {
         'Clique no botão **Nova Venda** abaixo para abrir o formulário.'
       )
       .setColor(2326507)
-      .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
+      .setFooter({ text: `LuxBot Vendas • criado por chegaheitor` })
       .setTimestamp();
 
     const btnNovaVenda = new ButtonBuilder()
@@ -109,7 +119,17 @@ export async function criarPainelVenda(client, guild) {
 export async function handleInteraction(interaction) {
   const customId = interaction.customId;
   const guild = interaction.guild;
-  const dataAtual = new Date().toLocaleDateString('pt-BR');
+
+  const recrutas = getRecrutas();
+  const isAccepted = interaction.member.permissions.has(PermissionFlagsBits.Administrator) ||
+    recrutas.some(r => r.discordId === interaction.user.id && r.status === 'ACEITO');
+
+  if (!isAccepted) {
+    return await interaction.reply({
+      content: '❌ Você precisa ter seu recrutamento aceito para interagir com o bot!',
+      ephemeral: true
+    });
+  }
 
   // 1. Botão Nova Venda clicado
   if (customId === 'venda_nova_btn') {
@@ -242,7 +262,7 @@ export async function handleInteraction(interaction) {
           { name: '💼 Vendedor:', value: `<@${interaction.user.id}>`, inline: true }
         )
         .setColor(2326507)
-        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Vendas • criado por chegaheitor` })
         .setTimestamp();
 
       const btnConfirmar = new ButtonBuilder()
@@ -291,7 +311,7 @@ export async function handleInteraction(interaction) {
           { name: '📅 Data:', value: dataVenda, inline: true },
           { name: '🤝 Parceria:', value: parceria, inline: true }
         )
-        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Vendas • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
@@ -356,7 +376,7 @@ export async function handleInteraction(interaction) {
         .setTitle('✅ VENDA CONFIRMADA ✅')
         .setColor(3066993)
         .setDescription(`O administrador <@${interaction.user.id}> confirmou a venda realizada por <@${vendedorId}> no fórum <#${forumId}>.`)
-        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Vendas • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
@@ -390,7 +410,7 @@ export async function handleInteraction(interaction) {
         .setTitle('🗑️ VENDA EXCLUÍDA 🗑️')
         .setColor(15158332)
         .setDescription(`O administrador <@${interaction.user.id}> excluiu o tópico de venda **${thread.name}** no fórum <#${forumId}>.`)
-        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Vendas • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
@@ -466,7 +486,7 @@ export async function handleInteraction(interaction) {
         .setTitle('↩️ VENDA DESCONFIRMADA ↩️')
         .setColor(3447003)
         .setDescription(`O administrador <@${interaction.user.id}> desconfirmou a venda de <@${vendedorId}> no fórum <#${forumId}>.`)
-        .setFooter({ text: `LuxBot Vendas • ${dataAtual} • criado por chegaheitor` })
+        .setFooter({ text: `LuxBot Vendas • criado por chegaheitor` })
         .setTimestamp();
 
       await sendLog(interaction.client, guild, 'registrovenda', logEmbed);
