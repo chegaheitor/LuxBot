@@ -342,8 +342,8 @@ export async function handleInteraction(interaction) {
         });
       }
 
-      // Reagir com 💩
-      await interaction.message.react('💩').catch(() => null);
+      // Reagir com 💸
+      await interaction.message.react('💸').catch(() => null);
 
       // Editar embed
       const originalEmbed = interaction.message.embeds[0];
@@ -442,8 +442,8 @@ export async function handleInteraction(interaction) {
         });
       }
 
-      // Remover reação 💩
-      const reaction = interaction.message.reactions.cache.find(r => r.emoji.name === '💩');
+      // Remover reação 💸
+      const reaction = interaction.message.reactions.cache.find(r => r.emoji.name === '💸');
       if (reaction) {
         await reaction.users.remove(interaction.client.user.id).catch(() => null);
       }

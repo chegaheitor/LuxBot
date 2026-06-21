@@ -541,6 +541,7 @@ export async function handleInteraction(interaction) {
         const parts = customId.replace('farm_pagar_meta_btn_', '').split('_');
         const donoId = parts[0];
         let item = parts[1];
+        const targetMeta = parts[2] || '0';
 
         // Verificar permissão
         const channelConfig = getFarmChannel(interaction.channelId);
@@ -551,14 +552,20 @@ export async function handleInteraction(interaction) {
         }
 
         // Tenta extrair o item do embed se não estiver no customId
-        if (!item && interaction.message.embeds[0] && interaction.message.embeds[0].description) {
-          const matchItem = interaction.message.embeds[0].description.match(/📦 \*\*Recurso:\*\* ([^\n]+)/);
-          if (matchItem) item = matchItem[1].trim();
+        if (!item && interaction.message.embeds[0]) {
+          const embed = interaction.message.embeds[0];
+          if (embed.description) {
+            const matchItem = embed.description.match(/📦 \*\*Recurso:\*\* ([^\n]+)/);
+            if (matchItem) item = matchItem[1].trim();
+          } else if (embed.fields && embed.fields.length > 0) {
+            const fieldItem = embed.fields.find(f => f.name && f.name.includes('Recurso'));
+            if (fieldItem) item = fieldItem.value.trim();
+          }
         }
 
         const modal = new ModalBuilder()
-          .setCustomId(`farm_pagar_meta_modal_${donoId}_${item || 'Outros'}`)
-          .setTitle('💩 CONFIRMAR PAGAMENTO 💩');
+          .setCustomId(`farm_pagar_meta_modal_${donoId}_${item || 'Outros'}_${targetMeta}`)
+          .setTitle('💸 CONFIRMAR PAGAMENTO 💸');
 
         const valorInput = new TextInputBuilder()
           .setCustomId('valor_input')
@@ -584,10 +591,9 @@ export async function handleInteraction(interaction) {
         );
 
         await interaction.showModal(modal);
-
       } catch (error) {
-        console.error('Erro ao abrir modal de pagamento de meta:', error);
-        await interaction.reply({ content: 'Erro ao abrir formulário de confirmação de pagamento.', ephemeral: true });
+        console.error('Erro ao abrir modal de pagamento:', error);
+        await interaction.reply({ content: '❌ Erro ao processar o pagamento.', ephemeral: true });
       }
     }
 
@@ -608,11 +614,37 @@ export async function handleInteraction(interaction) {
 
         const originalEmbed = interaction.message.embeds[0];
         let quantidade = '';
-        if (!item && originalEmbed && originalEmbed.description) {
-          const matchItem = originalEmbed.description.match(/📦 \*\*Recurso:\*\* ([^\n]+)/);
-          if (matchItem) item = matchItem[1].trim();
-          const matchQtd = originalEmbed.description.match(/🔢 \*\*Quantidade:\*\* ([^\n]+)/);
-          if (matchQtd) quantidade = matchQtd[1].trim();
+        let quantidadePaga = 0;
+        let sobraAcumulada = 0;
+
+        if (originalEmbed) {
+          if (originalEmbed.fields && originalEmbed.fields.length > 0) {
+            const fieldPaid = originalEmbed.fields.find(f => f.name && f.name.includes('Quantidade Paga'));
+            if (fieldPaid) {
+              quantidadePaga = parseInt(fieldPaid.value.replace(/`|un|\s/g, ''), 10) || 0;
+            }
+            const fieldSobra = originalEmbed.fields.find(f => f.name && f.name.includes('Sobra Acumulada'));
+            if (fieldSobra) {
+              sobraAcumulada = parseInt(fieldSobra.value.replace(/`|un|\s/g, ''), 10) || 0;
+            }
+
+            if (quantidadePaga > 0) {
+              quantidade = String(quantidadePaga + sobraAcumulada);
+            } else {
+              const fieldProg = originalEmbed.fields.find(f => f.name && (f.name.includes('Progresso Total') || f.name.includes('Progresso Entregue')));
+              if (fieldProg) quantidade = fieldProg.value.replace(/`|un|\s/g, '').trim();
+            }
+
+            if (!item) {
+              const fieldItem = originalEmbed.fields.find(f => f.name && f.name.includes('Recurso'));
+              if (fieldItem) item = fieldItem.value.replace(/\*\*|\*/g, '').trim();
+            }
+          } else if (originalEmbed.description) {
+            const matchItem = originalEmbed.description.match(/📦 \*\*Recurso:\*\* ([^\n]+)/);
+            if (matchItem && !item) item = matchItem[1].trim();
+            const matchQtd = originalEmbed.description.match(/🔢 \*\*Quantidade:\*\* ([^\n]+)/) || originalEmbed.description.match(/🔢 \*\*Quantidade da Meta:\*\* ([^\n]+)/);
+            if (matchQtd) quantidade = matchQtd[1].trim();
+          }
         }
 
         // Remover do banco
@@ -621,18 +653,22 @@ export async function handleInteraction(interaction) {
         // Atualizar o embed principal do canal para restaurar o progresso
         await updateFarmChannelEmbed(interaction.client, interaction.channelId);
 
-        // Remover reação 💩 (ou 💰 caso o usuário clique em uma antiga)
-        const reaction = interaction.message.reactions.cache.find(r => r.emoji.name === '💩' || r.emoji.name === '💰');
+        // Remover reação 💸
+        const reaction = interaction.message.reactions.cache.find(r => r.emoji.name === '💸');
         if (reaction) {
           await reaction.users.remove(interaction.client.user.id).catch(() => null);
         }
 
         // Reverter embed
         let timestamp = '';
-        if (originalEmbed && originalEmbed.description) {
-          const match = originalEmbed.description.match(/📅 \*\*Data da Meta:\*\* ([^\n]+)/) || originalEmbed.description.match(/📅 \*\*Data\/Hora:\*\* ([^\n]+)/);
-          if (match) {
-            timestamp = match[1];
+        if (originalEmbed) {
+          if (originalEmbed.description) {
+            const match = originalEmbed.description.match(/📅 \*\*Data da Meta:\*\* ([^\n]+)/) || originalEmbed.description.match(/📅 \*\*Data\/Hora:\*\* ([^\n]+)/);
+            if (match) timestamp = match[1];
+          }
+          if (!timestamp && originalEmbed.fields && originalEmbed.fields.length > 0) {
+            const fieldTime = originalEmbed.fields.find(f => f.name && f.name.includes('Data'));
+            if (fieldTime) timestamp = fieldTime.value.replace(/`/g, '').trim();
           }
         }
         if (!timestamp) {
@@ -640,23 +676,37 @@ export async function handleInteraction(interaction) {
           timestamp = msgDate.toLocaleDateString('pt-BR') + ' às ' + msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
         }
 
+        const farmConfig = getGlobalFarmConfig() || { metas: {} };
+        const metas = farmConfig.metas || {};
+        const targetMeta = item ? (metas[item] || 0) : 0;
+
+        const totalQtdVal = parseInt(quantidade || 0, 10);
         const revertedEmbed = new EmbedBuilder()
           .setTitle('✨ META BATIDA ✨')
-          .setDescription(
-            `👤 **Membro:** <@${donoId}>\n` +
-            (item ? `📦 **Recurso:** ${item}\n` : '') +
-            (quantidade ? `🔢 **Quantidade:** ${quantidade}\n` : '') +
-            `📅 **Data/Hora:** ${timestamp}\n\n` +
-            `Aguardando a confirmação do pagamento pelos administradores.`
-          )
           .setColor(3066993)
+          .addFields(
+            { name: '👤 Membro', value: `<@${donoId}>`, inline: true },
+            { name: '📦 Recurso', value: item || 'Outros', inline: true },
+            { name: '\u200B', value: '\u200B', inline: false },
+            { name: '🔢 Quantidade da Meta', value: targetMeta > 0 ? `\`${targetMeta}\` un` : `\`${totalQtdVal}\` un`, inline: true },
+            { name: '📊 Progresso Total', value: `\`${totalQtdVal}\` un`, inline: true },
+            { name: '\u200B', value: '\u200B', inline: false },
+            { name: '📅 Data/Hora', value: timestamp, inline: true }
+          )
           .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
 
+        const extra = totalQtdVal > targetMeta && targetMeta > 0 ? (totalQtdVal - targetMeta) : 0;
+        if (extra > 0) {
+          revertedEmbed.addFields({ name: '🚀 Acúmulo Extra', value: `\`+${extra}\` un de **${item}** serão mantidos para a próxima meta!`, inline: false });
+        }
+
+        revertedEmbed.addFields({ name: '📝 Status', value: '⏳ Aguardando a confirmação do pagamento pelos administradores.', inline: false });
+
         const btnPagar = new ButtonBuilder()
-          .setCustomId(`farm_pagar_meta_btn_${donoId}_${item || ''}`)
+          .setCustomId(`farm_pagar_meta_btn_${donoId}_${item || ''}_${targetMeta}`)
           .setLabel('Pagar Meta')
           .setStyle(ButtonStyle.Success)
-          .setEmoji('💩');
+          .setEmoji('💸');
 
         const btnIncompleta = new ButtonBuilder()
           .setCustomId(`farm_meta_incompleta_btn_${donoId}_${item || ''}`)
@@ -708,24 +758,44 @@ export async function handleInteraction(interaction) {
         }
 
         const originalEmbed = interaction.message.embeds[0];
-        let description = '';
-        if (originalEmbed && originalEmbed.description) {
-          const partsDesc = originalEmbed.description.split('\n\n❌');
-          description = partsDesc[0] + '\n\nAguardando a confirmação do pagamento pelos administradores.';
+        let revertedEmbed;
+
+        const farmConfig = getGlobalFarmConfig() || { metas: {} };
+        const metas = farmConfig.metas || {};
+        const targetMeta = item ? (metas[item] || 0) : 0;
+
+        if (originalEmbed) {
+          const cleanFields = originalEmbed.fields.filter(f => 
+            !f.name.includes('Status') && 
+            !f.name.includes('Motivo') && 
+            !f.name.includes('Por') && 
+            !f.name.includes('Horário') &&
+            !f.name.includes('⚠️')
+          );
+          
+          revertedEmbed = new EmbedBuilder()
+            .setTitle('✨ META BATIDA ✨')
+            .setColor(3066993)
+            .addFields(cleanFields)
+            .addFields({ name: '📝 Status', value: '⏳ Aguardando a confirmação do pagamento pelos administradores.', inline: false })
+            .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
         } else {
-          description = 'Aguardando a confirmação do pagamento pelos administradores.';
+          revertedEmbed = new EmbedBuilder()
+            .setTitle('✨ META BATIDA ✨')
+            .setColor(3066993)
+            .addFields(
+              { name: '👤 Membro', value: `<@${donoId}>`, inline: true },
+              { name: '📦 Recurso', value: item || 'Outros', inline: true },
+              { name: '📝 Status', value: '⏳ Aguardando a confirmação do pagamento pelos administradores.', inline: false }
+            )
+            .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
         }
 
-        const revertedEmbed = EmbedBuilder.from(originalEmbed)
-          .setTitle('✨ META BATIDA ✨')
-          .setColor(3066993)
-          .setDescription(description);
-
         const btnPagar = new ButtonBuilder()
-          .setCustomId(`farm_pagar_meta_btn_${donoId}_${item || ''}`)
+          .setCustomId(`farm_pagar_meta_btn_${donoId}_${item || ''}_${targetMeta}`)
           .setLabel('Pagar Meta')
           .setStyle(ButtonStyle.Success)
-          .setEmoji('💩');
+          .setEmoji('💸');
 
         const btnIncompleta = new ButtonBuilder()
           .setCustomId(`farm_meta_incompleta_btn_${donoId}_${item || ''}`)
@@ -983,23 +1053,25 @@ export async function handleInteraction(interaction) {
         // 3. Montar o embed público de meta batida
         const extra = current > targetMeta && targetMeta > 0 ? (current - targetMeta) : 0;
 
-        let desc = `👤 **Membro:** <@${channelConfig.donoId}>\n` +
-          `📦 **Recurso:** ${itemSelecionado}\n` +
-          `🔢 **Quantidade da Meta:** ${targetMeta > 0 ? targetMeta : current}\n` +
-          `📊 **Progresso Total:** ${current}\n` +
-          `📅 **Data/Hora:** ${dataStr}\n\n`;
-
-        if (extra > 0) {
-          desc += `🚀 **Acúmulo Extra:** +\`${extra}\` un de ${itemSelecionado} serão mantidos para a próxima meta!\n\n`;
-        }
-
-        desc += `Aguardando a confirmação do pagamento pelos administradores.`;
-
         const embed = new EmbedBuilder()
           .setTitle('✨ META BATIDA ✨')
-          .setDescription(desc)
           .setColor(3066993)
+          .addFields(
+            { name: '👤 Membro', value: `<@${channelConfig.donoId}>`, inline: true },
+            { name: '📦 Recurso', value: itemSelecionado, inline: true },
+            { name: '\u200B', value: '\u200B', inline: false },
+            { name: '🔢 Quantidade da Meta', value: targetMeta > 0 ? `\`${targetMeta}\` un` : `\`${current}\` un`, inline: true },
+            { name: '📊 Progresso Total', value: `\`${current}\` un`, inline: true },
+            { name: '\u200B', value: '\u200B', inline: false },
+            { name: '📅 Data/Hora', value: dataStr, inline: true }
+          )
           .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
+
+        if (extra > 0) {
+          embed.addFields({ name: '🚀 Acúmulo Extra', value: `\`+${extra}\` un de **${itemSelecionado}** serão mantidos para a próxima meta!`, inline: false });
+        }
+
+        embed.addFields({ name: '📝 Status', value: '⏳ Aguardando a confirmação do pagamento pelos administradores.', inline: false });
 
         // Botão pagar meta carrega o targetMeta no final do customId para o addPaidMeta saber quanto descontar
         const btnPagar = new ButtonBuilder()
@@ -1141,31 +1213,53 @@ export async function handleInteraction(interaction) {
         // Atualizar o embed principal do canal
         await updateFarmChannelEmbed(interaction.client, interaction.channelId);
 
-        // Reagir com 💩 (conforme requisitado para trocar 💰 por 💩)
-        await interaction.message.react('💩').catch(() => null);
+        // Reagir com 💸
+        await interaction.message.react('💸').catch(() => null);
 
         // Obter data da mensagem original
         const msgDate = interaction.message.createdAt || new Date();
         const dataMensagem = msgDate.toLocaleDateString('pt-BR') + ' às ' + msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
         const originalEmbed = interaction.message.embeds[0];
-        let quantidade = '';
-        if (originalEmbed && originalEmbed.description) {
-          const matchQtd = originalEmbed.description.match(/🔢 \*\*Quantidade:\*\* ([^\n]+)/);
-          if (matchQtd) quantidade = matchQtd[1].trim();
+        let quantidade = '0';
+        if (originalEmbed) {
+          if (originalEmbed.fields && originalEmbed.fields.length > 0) {
+            const fieldProg = originalEmbed.fields.find(f => f.name && (f.name.includes('Progresso Total') || f.name.includes('Progresso Entregue')));
+            if (fieldProg) {
+              quantidade = fieldProg.value.replace(/`|un|\s/g, '').trim();
+            }
+          } else if (originalEmbed.description) {
+            const matchQtd = originalEmbed.description.match(/🔢 \*\*Quantidade:\*\* ([^\n]+)/) || originalEmbed.description.match(/🔢 \*\*Quantidade da Meta:\*\* ([^\n]+)/);
+            if (matchQtd) quantidade = matchQtd[1].trim();
+          }
+        }
+
+        const totalDelivered = parseInt(quantidade || 0, 10);
+        const metaTargetVal = parseInt(targetMeta || 0, 10);
+        
+        let valorPagoMeta = totalDelivered;
+        let sobraCarryOver = 0;
+        
+        if (metaTargetVal > 0 && totalDelivered > metaTargetVal) {
+          valorPagoMeta = metaTargetVal;
+          sobraCarryOver = totalDelivered - metaTargetVal;
         }
 
         const updatedEmbed = new EmbedBuilder()
-          .setTitle('💩 META PAGA 💩')
+          .setTitle('💸 META CONFIRMADA E PAGA 💸')
           .setColor(3066993)
-          .setDescription(
-            `👤 **Membro:** <@${donoId}>\n` +
-            (item ? `📦 **Recurso:** ${item}\n` : '') +
-            (quantidade ? `🔢 **Quantidade:** ${quantidade}\n` : '') +
-            `📅 **Data da Meta:** ${dataMensagem}\n` +
-            `💰 **Valor Pago:** ${valor}\n` +
-            `💩 **Pago por:** <@${interaction.user.id}>\n` +
-            `📅 **Data do Pagamento:** ${dataStr}`
+          .addFields(
+            { name: '👤 Membro', value: `<@${donoId}>`, inline: true },
+            { name: '📦 Recurso', value: item || 'Outros', inline: true },
+            { name: '\u200B', value: '\u200B', inline: false },
+            { name: '🔢 Quantidade Paga', value: `\`${valorPagoMeta}\` un`, inline: true },
+            { name: '💰 Valor do Pagamento', value: `\`${valor}\``, inline: true },
+            { name: '\u200B', value: '\u200B', inline: false },
+            { name: '📊 Sobra Acumulada', value: sobraCarryOver > 0 ? `\`${sobraCarryOver}\` un (mantidos no inventário)` : '`0` un', inline: true },
+            { name: '📅 Data da Meta', value: dataMensagem, inline: true },
+            { name: '\u200B', value: '\u200B', inline: false },
+            { name: '💸 Pago Por', value: `<@${interaction.user.id}>`, inline: true },
+            { name: '📅 Data do Pagamento', value: dataStr, inline: true }
           )
           .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
 
@@ -1186,12 +1280,15 @@ export async function handleInteraction(interaction) {
 
         // Enviar log de pagamento de meta
         const logEmbed = new EmbedBuilder()
-          .setTitle('💩 META CONFIRMADA/PAGA 💩')
+          .setTitle('💸 META CONFIRMADA E PAGA 💸')
           .setColor(3066993)
-          .setDescription(`O administrador <@${interaction.user.id}> marcou como paga a meta de <@${donoId}>.`)
+          .setDescription(`O administrador <@${interaction.user.id}> confirmou o pagamento da meta de <@${donoId}>.`)
           .addFields(
-            { name: '💰 Valor Pago:', value: valor, inline: true },
-            { name: '📅 Data do Pagamento:', value: dataStr, inline: true }
+            { name: '📦 Recurso', value: item || 'Outros', inline: true },
+            { name: '🔢 Qtd Paga', value: `\`${valorPagoMeta}\` un`, inline: true },
+            { name: '💰 Valor do Pagamento', value: `\`${valor}\``, inline: true },
+            { name: '📊 Sobra', value: sobraCarryOver > 0 ? `\`${sobraCarryOver}\` un` : '`0` un', inline: true },
+            { name: '📅 Data do Pagamento', value: dataStr, inline: true }
           )
           .setTimestamp();
         await sendLog(interaction.client, guild, 'registrofarm', logEmbed);
