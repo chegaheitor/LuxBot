@@ -276,13 +276,19 @@ export async function handleInteraction(interaction) {
         // Alterar o apelido do usuário no servidor para: NOME | ID
         const recrutas = getRecrutas();
         const recruta = recrutas.find(r => r.discordId === userId);
+        let nicknameStatus = '';
         if (recruta) {
           const newNickname = `${recruta.nome} | ${recruta.gameId}`;
-          if (newNickname.length <= 32) {
-            await member.setNickname(newNickname).catch(e => console.error('Erro ao alterar apelido:', e));
-          } else {
-            await member.setNickname(newNickname.substring(0, 32)).catch(e => console.error('Erro ao alterar apelido (truncado):', e));
+          const finalNickname = newNickname.length <= 32 ? newNickname : newNickname.substring(0, 32);
+          try {
+            await member.setNickname(finalNickname);
+            nicknameStatus = ` e apelido alterado para **${finalNickname}**`;
+          } catch (e) {
+            console.error('Erro ao alterar apelido:', e);
+            nicknameStatus = ` (⚠️ mas não foi possível alterar o apelido no Discord: falta de permissão ou dono do servidor)`;
           }
+        } else {
+          nicknameStatus = ` (⚠️ mas não foi possível alterar o apelido: ficha não encontrada no banco de dados)`;
         }
 
         // Retirar o cargo inicial configurado no painelconfig, se aplicável
@@ -307,7 +313,7 @@ export async function handleInteraction(interaction) {
           .setColor(3066993);
 
         await interaction.update({
-          content: `✅ Pedido aceito por <@${interaction.user.id}>! O cargo <@&${cargoId}> foi adicionado para <@${userId}>.`,
+          content: `✅ Pedido aceito por <@${interaction.user.id}>! O cargo <@&${cargoId}> foi adicionado para <@${userId}>${nicknameStatus}.`,
           embeds: [updatedEmbed],
           components: []
         });

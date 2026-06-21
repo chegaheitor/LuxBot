@@ -138,9 +138,20 @@ export async function handleInteraction(interaction) {
         const novoNome = interaction.fields.getTextInputValue('nome_input').trim();
         
         updateRecruta(targetUserId, { nome: novoNome });
+        const recruta = getOrCreateRecruta(targetUserId);
+
+        // Alterar nickname no servidor para NOME | ID
+        const member = await guild.members.fetch(targetUserId).catch(() => null);
+        if (member) {
+          const newNickname = `${novoNome} | ${recruta.gameId || ''}`;
+          if (newNickname.length <= 32) {
+            await member.setNickname(newNickname).catch(e => console.error('Erro ao alterar apelido:', e));
+          } else {
+            await member.setNickname(newNickname.substring(0, 32)).catch(e => console.error('Erro ao alterar apelido (truncado):', e));
+          }
+        }
         
         const targetUser = await interaction.client.users.fetch(targetUserId).catch(() => null);
-        const recruta = getOrCreateRecruta(targetUserId);
         const embed = generatePerfilEmbed(targetUser, recruta);
         
         const row1 = new ActionRowBuilder().addComponents(
@@ -169,9 +180,20 @@ export async function handleInteraction(interaction) {
         const novoId = interaction.fields.getTextInputValue('id_input').trim();
         
         updateRecruta(targetUserId, { gameId: novoId });
+        const recruta = getOrCreateRecruta(targetUserId);
+
+        // Alterar nickname no servidor para NOME | ID
+        const member = await guild.members.fetch(targetUserId).catch(() => null);
+        if (member) {
+          const newNickname = `${recruta.nome || ''} | ${novoId}`;
+          if (newNickname.length <= 32) {
+            await member.setNickname(newNickname).catch(e => console.error('Erro ao alterar apelido:', e));
+          } else {
+            await member.setNickname(newNickname.substring(0, 32)).catch(e => console.error('Erro ao alterar apelido (truncado):', e));
+          }
+        }
         
         const targetUser = await interaction.client.users.fetch(targetUserId).catch(() => null);
-        const recruta = getOrCreateRecruta(targetUserId);
         const embed = generatePerfilEmbed(targetUser, recruta);
         
         const row1 = new ActionRowBuilder().addComponents(

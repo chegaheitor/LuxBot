@@ -21,7 +21,10 @@ initDatabase();
 
 // Inicializar o bot
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers
+  ]
 });
 
 // Registrar coleção de comandos
