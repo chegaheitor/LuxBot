@@ -6,8 +6,10 @@ function hasAdminPermission(interaction, channelConfig) {
   if (interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
     return true;
   }
-  if (channelConfig && channelConfig.cargosAdminIds && Array.isArray(channelConfig.cargosAdminIds)) {
-    return channelConfig.cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId));
+  const globalConfig = getGlobalFarmConfig();
+  const cargosAdminIds = channelConfig?.cargosAdminIds || globalConfig?.cargosAdminIds || [];
+  if (Array.isArray(cargosAdminIds) && cargosAdminIds.length > 0) {
+    return cargosAdminIds.some(roleId => interaction.member.roles.cache.has(roleId));
   }
   return false;
 }
@@ -493,6 +495,7 @@ export async function handleInteraction(interaction) {
           .setTimestamp();
         await sendLog(interaction.client, guild, 'registrofarm', logEmbed);
 
+        await interaction.deferUpdate();
         await interaction.message.delete().catch(() => null);
       } catch (error) {
         console.error('Erro ao apagar declaração de farm:', error);
@@ -780,6 +783,7 @@ export async function handleInteraction(interaction) {
           .setTimestamp();
         await sendLog(interaction.client, guild, 'registrofarm', logEmbed);
 
+        await interaction.deferUpdate();
         await interaction.message.delete().catch(() => null);
       } catch (error) {
         console.error('Erro ao excluir meta:', error);
@@ -946,38 +950,103 @@ export async function handleInteraction(interaction) {
           return await interaction.reply({ content: 'Erro: Pasta de farm não configurada no banco.', ephemeral: true });
         }
 
-        // Abre modal para quantidade e data/hora
-        const modal = new ModalBuilder()
-          .setCustomId(`farm_bati_meta_modal_${itemSelecionado}`)
-          .setTitle(`✨ Meta: ${itemSelecionado} ✨`);
+        // 1. Obter progresso acumulado (confirmado e não pago) deste recurso
+        const recrutas = getRecrutas();
+        const recruta = recrutas.find(r => r.discordId === channelConfig.donoId);
+        const farms = recruta?.farms || [];
+        const current = farms
+          .filter(f => f.item.toLowerCase() === itemSelecionado.toLowerCase() && !f.pago)
+          .reduce((sum, f) => sum + parseInt(f.quantidade || 0, 10), 0);
 
-        const qtdInput = new TextInputBuilder()
-          .setCustomId('qtd_input')
-          .setLabel('QUANTIDADE DA META')
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder('Digite a quantidade (ex: 100k, 50.000)')
-          .setRequired(true);
+        if (current === 0) {
+          return await interaction.reply({
+            content: `❌ Você não possui nenhum farm confirmado e não pago de **${itemSelecionado}** para declarar meta batida!`,
+            ephemeral: true
+          });
+        }
 
+        // 2. Obter valor da meta global configurada
+        const farmConfig = getGlobalFarmConfig() || { metas: {} };
+        const metas = farmConfig.metas || {};
+        const targetMeta = metas[itemSelecionado] || 0;
+
+        // Salvar meta declarada no banco para estatísticas de perfil
         const now = new Date();
-        const dataFormatada = now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const dataStr = now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-        const dataInput = new TextInputBuilder()
-          .setCustomId('data_input')
-          .setLabel('DATA E HORA')
-          .setStyle(TextInputStyle.Short)
-          .setValue(dataFormatada)
-          .setPlaceholder('DD/MM/AAAA às HH:MM')
-          .setRequired(true);
+        addMetaDeclarada(channelConfig.donoId, interaction.user.tag, {
+          item: itemSelecionado,
+          quantidade: String(current),
+          data: dataStr
+        });
 
-        modal.addComponents(
-          new ActionRowBuilder().addComponents(qtdInput),
-          new ActionRowBuilder().addComponents(dataInput)
-        );
+        // 3. Montar o embed público de meta batida
+        const extra = current > targetMeta && targetMeta > 0 ? (current - targetMeta) : 0;
 
-        await interaction.showModal(modal);
+        let desc = `👤 **Membro:** <@${channelConfig.donoId}>\n` +
+          `📦 **Recurso:** ${itemSelecionado}\n` +
+          `🔢 **Quantidade da Meta:** ${targetMeta > 0 ? targetMeta : current}\n` +
+          `📊 **Progresso Total:** ${current}\n` +
+          `📅 **Data/Hora:** ${dataStr}\n\n`;
+
+        if (extra > 0) {
+          desc += `🚀 **Acúmulo Extra:** +\`${extra}\` un de ${itemSelecionado} serão mantidos para a próxima meta!\n\n`;
+        }
+
+        desc += `Aguardando a confirmação do pagamento pelos administradores.`;
+
+        const embed = new EmbedBuilder()
+          .setTitle('✨ META BATIDA ✨')
+          .setDescription(desc)
+          .setColor(3066993)
+          .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
+
+        // Botão pagar meta carrega o targetMeta no final do customId para o addPaidMeta saber quanto descontar
+        const btnPagar = new ButtonBuilder()
+          .setCustomId(`farm_pagar_meta_btn_${channelConfig.donoId}_${itemSelecionado}_${targetMeta}`)
+          .setLabel('Pagar Meta')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('💸');
+
+        const btnIncompleta = new ButtonBuilder()
+          .setCustomId(`farm_meta_incompleta_btn_${channelConfig.donoId}_${itemSelecionado}`)
+          .setLabel('Meta Incompleta')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('⚠️');
+
+        const btnExcluir = new ButtonBuilder()
+          .setCustomId('farm_excluir_meta_btn')
+          .setLabel('Excluir Meta')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('🗑️');
+
+        const row = new ActionRowBuilder().addComponents(btnPagar, btnIncompleta, btnExcluir);
+
+        // Envia mensagem pública no canal
+        await interaction.channel.send({ embeds: [embed], components: [row] });
+
+        // Responde de forma ephemeral à interação do menu
+        await interaction.reply({
+          content: `✅ Sua meta batida de **${itemSelecionado}** foi declarada publicamente no canal!`,
+          ephemeral: true
+        });
+
+        // Enviar log de meta batida
+        const logEmbed = new EmbedBuilder()
+          .setTitle('✨ META BATIDA DECLARADA ✨')
+          .setColor(3447003)
+          .setDescription(`O usuário <@${channelConfig.donoId}> declarou que bateu a meta.`)
+          .addFields(
+            { name: '📦 Recurso:', value: itemSelecionado, inline: true },
+            { name: '🔢 Quantidade:', value: String(current), inline: true },
+            { name: '📅 Data/Hora:', value: dataStr, inline: true }
+          )
+          .setTimestamp();
+        await sendLog(interaction.client, interaction.guild, 'registrofarm', logEmbed);
+
       } catch (error) {
         console.error('Erro ao processar select de meta:', error);
-        await interaction.reply({ content: 'Erro ao abrir formulário de meta.', ephemeral: true });
+        await interaction.reply({ content: 'Erro ao declarar meta batida.', ephemeral: true }).catch(() => null);
       }
     }
   }
@@ -1050,90 +1119,13 @@ export async function handleInteraction(interaction) {
       }
     }
 
-    // Modal de Declaração de Meta Batida (Membro)
-    if (customId.startsWith('farm_bati_meta_modal_')) {
-      try {
-        const item = customId.replace('farm_bati_meta_modal_', '');
-        const quantidade = interaction.fields.getTextInputValue('qtd_input').trim();
-        const dataStr = interaction.fields.getTextInputValue('data_input');
-
-        if (!/^\d+$/.test(quantidade)) {
-          return await interaction.reply({
-            content: '❌ A quantidade da meta deve ser um número inteiro válido (apenas dígitos).',
-            ephemeral: true
-          });
-        }
-
-        const channelConfig = getFarmChannel(interaction.channelId);
-        if (!channelConfig) {
-          return await interaction.reply({ content: 'Erro: Canal não cadastrado.', ephemeral: true });
-        }
-
-        // Salvar meta declarada no banco para estatísticas de perfil
-        addMetaDeclarada(channelConfig.donoId, interaction.user.tag, {
-          item: item,
-          quantidade: quantidade,
-          data: dataStr
-        });
-
-        const embed = new EmbedBuilder()
-          .setTitle('✨ META BATIDA ✨')
-          .setDescription(
-            `👤 **Membro:** <@${channelConfig.donoId}>\n` +
-            `📦 **Recurso:** ${item}\n` +
-            `🔢 **Quantidade:** ${quantidade}\n` +
-            `📅 **Data/Hora:** ${dataStr}\n\n` +
-            `Aguardando a confirmação do pagamento pelos administradores.`
-          )
-          .setColor(3066993)
-          .setFooter({ text: `LuxBot Farm • criado por chegaheitor` });
-
-        const btnPagar = new ButtonBuilder()
-          .setCustomId(`farm_pagar_meta_btn_${channelConfig.donoId}_${item}`)
-          .setLabel('Pagar Meta')
-          .setStyle(ButtonStyle.Success)
-          .setEmoji('💩');
-
-        const btnIncompleta = new ButtonBuilder()
-          .setCustomId(`farm_meta_incompleta_btn_${channelConfig.donoId}_${item}`)
-          .setLabel('Meta Incompleta')
-          .setStyle(ButtonStyle.Danger)
-          .setEmoji('⚠️');
-
-        const btnExcluir = new ButtonBuilder()
-          .setCustomId('farm_excluir_meta_btn')
-          .setLabel('Excluir Meta')
-          .setStyle(ButtonStyle.Danger)
-          .setEmoji('🗑️');
-
-        const row = new ActionRowBuilder().addComponents(btnPagar, btnIncompleta, btnExcluir);
-
-        await interaction.reply({ embeds: [embed], components: [row] });
-
-        // Enviar log de meta batida
-        const logEmbed = new EmbedBuilder()
-          .setTitle('✨ META BATIDA DECLARADA ✨')
-          .setColor(3447003)
-          .setDescription(`O usuário <@${channelConfig.donoId}> declarou que bateu a meta.`)
-          .addFields(
-            { name: '📦 Recurso:', value: item, inline: true },
-            { name: '🔢 Quantidade:', value: quantidade, inline: true },
-            { name: '📅 Data/Hora:', value: dataStr, inline: true }
-          )
-          .setTimestamp();
-        await sendLog(interaction.client, guild, 'registrofarm', logEmbed);
-      } catch (error) {
-        console.error('Erro ao enviar declaração de meta batida:', error);
-        await interaction.reply({ content: 'Erro ao registrar declaração de meta.', ephemeral: true });
-      }
-    }
-
     // Modal de Pagamento de Meta (Confirmar Pagamento)
     if (customId.startsWith('farm_pagar_meta_modal_')) {
       try {
         const parts = customId.replace('farm_pagar_meta_modal_', '').split('_');
         const donoId = parts[0];
         const item = parts[1];
+        const targetMeta = parts[2] || '0';
         const valor = interaction.fields.getTextInputValue('valor_input');
         const dataStr = interaction.fields.getTextInputValue('data_input');
 
@@ -1142,7 +1134,8 @@ export async function handleInteraction(interaction) {
           pagoPor: interaction.user.id,
           valor: valor,
           data: dataStr,
-          item: item
+          item: item,
+          targetMeta: parseInt(targetMeta, 10)
         });
 
         // Atualizar o embed principal do canal

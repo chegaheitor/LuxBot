@@ -235,11 +235,45 @@ export function addPaidMeta(discordId, metaData) {
 
   // Marcar farms correspondentes não pagos deste item como pagos com este paymentId
   if (metaData.item && recrutas[index].farms) {
-    recrutas[index].farms.forEach(f => {
-      if (f.item.toLowerCase() === metaData.item.toLowerCase() && !f.pago) {
-        f.pago = paymentId;
+    let amountToPay = parseInt(metaData.targetMeta || 0, 10);
+
+    if (amountToPay > 0) {
+      const itemFarms = recrutas[index].farms.filter(f => f.item.toLowerCase() === metaData.item.toLowerCase() && !f.pago);
+      for (const f of itemFarms) {
+        if (amountToPay <= 0) break;
+
+        const qty = parseInt(f.quantidade || 0, 10);
+        if (qty <= amountToPay) {
+          f.pago = paymentId;
+          amountToPay -= qty;
+        } else {
+          // Precisamos dividir o registro de farm
+          const remaining = qty - amountToPay;
+
+          // Modificar a quantidade do registro existente para o que sobrou (não pago)
+          f.quantidade = String(remaining);
+
+          // Adicionar um novo registro contendo a parte paga
+          recrutas[index].farms.push({
+            item: f.item,
+            quantidade: String(amountToPay),
+            data: f.data,
+            confirmadoPor: f.confirmadoPor,
+            confirmedAt: f.confirmedAt,
+            pago: paymentId
+          });
+
+          amountToPay = 0;
+        }
       }
-    });
+    } else {
+      // Se não há meta definida (targetMeta === 0), marca TODOS os farms não pagos deste recurso como pagos
+      recrutas[index].farms.forEach(f => {
+        if (f.item.toLowerCase() === metaData.item.toLowerCase() && !f.pago) {
+          f.pago = paymentId;
+        }
+      });
+    }
   }
 
   return saveDatabase({ ...db, recrutas });
